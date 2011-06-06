@@ -23,34 +23,49 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
+from ...db_plugins import *
 try:
 	from . import resources_rc
 except ImportError:
 	pass
 
-class DBManagerPlugin:
-	def __init__(self, iface):
-		self.iface = iface
-		self.dlg = None
 
-	def initGui(self):
-		self.action = QAction( QIcon(), u"DB Manager", self.iface.mainWindow() )
-		QObject.connect( self.action, SIGNAL( "triggered()" ), self.run )
-		self.iface.addPluginToDatabaseMenu( u"DB Manager", self.action )
+def classFactory():
+	return SpatiaLiteDBPlugin
 
-	def unload(self):
-		self.iface.removePluginDatabaseMenu( u"DB Manager", self.action )
-		if self.dlg != None:
-			self.dlg.close()
-			self.dlg = None
+class SpatiaLiteDBPlugin(DBPlugin):
 
-	def run(self):
-		if self.dlg == None:
-			from db_manager import DBManager
-			self.dlg = DBManager(self.iface, self.iface.mainWindow())
-			QObject.connect(self.dlg, SIGNAL("destroyed(QObject *)"), self.onDestroyed)
-		self.dlg.show()
+	@classmethod
+	def icon(self):
+		return QIcon(":/icons/spatialite_icon.png")
 
-	def onDestroyed(self, obj):
-		self.dlg = None
+	@classmethod
+	def typeName(self):
+		return 'spatialite'
+
+	@classmethod
+	def typeNameString(self):
+		return 'SpatiaLite'
+
+	@classmethod
+	def connectionSettingsKey(self):
+		return '/SpatiaLite/connections'
+
+
+	def connect(self, parent=None):
+		conn_name = self.connectionName()
+		settings = QSettings()
+		settings.beginGroup( u"/%s/%s" % (self.connectionSettingsKey(), conn_name) )
+
+		if not settings.contains( "sqlitepath" ): # non-existent entry?
+			raise InvalidDataException( 'there is no defined database connection "%s".' % conn_name )
+
+		database = unicode(settings.value("sqlitepath").toString())
+
+		import qgis.core
+		from .connector import SpatiaLiteDBConnector
+		uri = qgis.core.QgsDataSourceURI()
+		uri.setDatabase(database)
+		self.connector = SpatiaLiteDBConnector(uri)
+		return True
 

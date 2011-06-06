@@ -1,3 +1,5 @@
 <RCC>
-    <qresource prefix="/db_manager"/>
+    <qresource prefix="/db_manager">
+        <file>icons/loading.gif</file>
+    </qresource>
 </RCC>

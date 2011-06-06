@@ -22,14 +22,15 @@ email                : brush.tyler@gmail.com
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-from ui.dbmanager_ui import Ui_DBManager
+from .ui.dbmanager_ui import Ui_DBManager
 
 class DBManager(QMainWindow, Ui_DBManager):
 
 	def __init__(self, iface, parent=None):
-		self.iface = iface
 		QMainWindow.__init__(self, parent)
+		self.setAttribute(Qt.WA_DeleteOnClose)
 		self.setupUi(self)
+		self.iface = iface
 
 		# restore the window state
 		settings = QSettings()

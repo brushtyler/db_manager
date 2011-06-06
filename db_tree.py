@@ -23,34 +23,20 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-try:
-	from . import resources_rc
-except ImportError:
-	pass
+from .db_model import DBModel
 
-class DBManagerPlugin:
-	def __init__(self, iface):
-		self.iface = iface
-		self.dlg = None
+class DBTree(QTreeView):
+	def __init__(self, parent=None):
+		QTreeView.__init__(self, parent)
+		self.setAttribute(Qt.WA_DeleteOnClose)
+		self.setModel( DBModel() )
 
-	def initGui(self):
-		self.action = QAction( QIcon(), u"DB Manager", self.iface.mainWindow() )
-		QObject.connect( self.action, SIGNAL( "triggered()" ), self.run )
-		self.iface.addPluginToDatabaseMenu( u"DB Manager", self.action )
+	def refresh(self, selectedItemOnly=False):
+		self.model().refresh(selectedItemOnly)
 
-	def unload(self):
-		self.iface.removePluginDatabaseMenu( u"DB Manager", self.action )
-		if self.dlg != None:
-			self.dlg.close()
-			self.dlg = None
-
-	def run(self):
-		if self.dlg == None:
-			from db_manager import DBManager
-			self.dlg = DBManager(self.iface, self.iface.mainWindow())
-			QObject.connect(self.dlg, SIGNAL("destroyed(QObject *)"), self.onDestroyed)
-		self.dlg.show()
-
-	def onDestroyed(self, obj):
-		self.dlg = None
+	def currentItem(self):
+		indexes = self.selectedIndexes()
+		if len(indexes) <= 0:
+			return
+		return self.model().getItem(indexes[0])
 

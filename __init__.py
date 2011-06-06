@@ -36,6 +36,6 @@ def authorName():
 	return "Giuseppe Sucameli"
 
 def classFactory(iface):
-	from db_manager_plugin import DBManagerPlugin
+	from .db_manager_plugin import DBManagerPlugin
 	return DBManagerPlugin(iface)
 
