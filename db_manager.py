@@ -22,7 +22,7 @@ email                : brush.tyler@gmail.com
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-from .ui.dbmanager_ui import Ui_DBManager
+from .ui.DbManager_ui import Ui_DBManager
 
 class DBManager(QMainWindow, Ui_DBManager):
 
@@ -37,6 +37,12 @@ class DBManager(QMainWindow, Ui_DBManager):
 		self.restoreGeometry( settings.value("/DB_Manager/geometry").toByteArray() )
 		self.restoreState( settings.value("/DB_Manager/windowState").toByteArray() )
 
+		self.connect(self.treeView, SIGNAL("currentChanged"), self.itemChanged)
+
+		self.connect(self.actionRunQuery, SIGNAL("triggered()"), self.runQuery)
+		self.connect(self.actionExit, SIGNAL("triggered()"), self.close)
+
+
 	def closeEvent(self, e):
 		# save the window state
 		settings = QSettings()
@@ -44,6 +50,21 @@ class DBManager(QMainWindow, Ui_DBManager):
 		settings.setValue( "/DB_Manager/geometry", QVariant(self.saveGeometry()) )
 
 		QMainWindow.closeEvent(self, e)
+
+
+	def itemChanged(self, item):
+		if item: self.infoTab.showInfo(item)
+
+	def runQuery(self):
+		db = self.treeView.currentDatabase()
+		if db == None:
+			QMessageBox.information(self, u"Sorry", u"No database selected or you are not connected.")
+			return
+
+		from dlg_sql_window import DlgSqlWindow
+		dlg = DlgSqlWindow(self, db)
+		dlg.exec_()
+		self.emit( SIGNAL('reloadDatabase'), db)
 
 
 	def registerAction(self, action, menu, callback):

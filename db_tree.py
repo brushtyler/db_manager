@@ -28,15 +28,28 @@ from .db_model import DBModel
 class DBTree(QTreeView):
 	def __init__(self, parent=None):
 		QTreeView.__init__(self, parent)
-		self.setAttribute(Qt.WA_DeleteOnClose)
-		self.setModel( DBModel() )
+		self.setModel( DBModel(self) )
 
-	def refresh(self, selectedItemOnly=False):
-		self.model().refresh(selectedItemOnly)
+		self.connect(self.selectionModel(), SIGNAL("currentChanged(const QModelIndex&, const QModelIndex&)"), self.itemChanged)
+		self.connect(self, SIGNAL("expanded(const QModelIndex&)"), self.itemChanged)
+		self.connect(self, SIGNAL("collapsed(const QModelIndex&)"), self.itemChanged)
+		self.connect(self.model(), SIGNAL("dataChanged(const QModelIndex&, const QModelIndex&)"), self.itemChanged)
 
 	def currentItem(self):
 		indexes = self.selectedIndexes()
 		if len(indexes) <= 0:
 			return
 		return self.model().getItem(indexes[0])
+
+	def currentDatabase(self):
+		item = self.currentItem()
+		if item == None: return
+		try:
+			return item.database()
+		except TypeError:
+			return None
+
+	def itemChanged(self, indexFrom, indexTo=None):
+		self.setCurrentIndex(indexFrom)
+		self.emit( SIGNAL('currentChanged'), self.currentItem() )
 

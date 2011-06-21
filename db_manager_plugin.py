@@ -42,7 +42,6 @@ class DBManagerPlugin:
 		self.iface.removePluginDatabaseMenu( u"DB Manager", self.action )
 		if self.dlg != None:
 			self.dlg.close()
-			self.dlg = None
 
 	def run(self):
 		if self.dlg == None:
@@ -52,5 +51,6 @@ class DBManagerPlugin:
 		self.dlg.show()
 
 	def onDestroyed(self, obj):
+		print ">>>>>> destroyed"
 		self.dlg = None
 
