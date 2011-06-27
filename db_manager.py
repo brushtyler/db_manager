@@ -22,14 +22,18 @@ email                : brush.tyler@gmail.com
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-from .ui.DbManager_ui import Ui_DBManager
 
-class DBManager(QMainWindow, Ui_DBManager):
+from .info_viewer import InfoViewer
+from .layer_preview import LayerPreview
+from .db_tree import DBTree
+
+
+class DBManager(QMainWindow):
 
 	def __init__(self, iface, parent=None):
 		QMainWindow.__init__(self, parent)
 		self.setAttribute(Qt.WA_DeleteOnClose)
-		self.setupUi(self)
+		self.setupUi()
 		self.iface = iface
 
 		# restore the window state
@@ -37,11 +41,8 @@ class DBManager(QMainWindow, Ui_DBManager):
 		self.restoreGeometry( settings.value("/DB_Manager/geometry").toByteArray() )
 		self.restoreState( settings.value("/DB_Manager/windowState").toByteArray() )
 
-		self.connect(self.treeView, SIGNAL("currentChanged"), self.itemChanged)
-
-		self.connect(self.actionRunQuery, SIGNAL("triggered()"), self.runQuery)
-		self.connect(self.actionExit, SIGNAL("triggered()"), self.close)
-
+		self.connect(self.tree, SIGNAL("currentChanged"), self.itemChanged)
+		self.itemChanged(None)
 
 	def closeEvent(self, e):
 		# save the window state
@@ -53,10 +54,31 @@ class DBManager(QMainWindow, Ui_DBManager):
 
 
 	def itemChanged(self, item):
-		if item: self.infoTab.showInfo(item)
+		self.refreshTabs( item )
 
-	def runQuery(self):
-		db = self.treeView.currentDatabase()
+	def refreshTabs(self, item):
+		# enable/disable tabs
+		self.tabs.setTabEnabled( self.tabs.indexOf(self.info), item != None )
+		self.tabs.setTabEnabled( self.tabs.indexOf(self.table), False )
+		self.tabs.setTabEnabled( self.tabs.indexOf(self.preview), False )
+
+		if not self.tabs.isTabEnabled( self.tabs.currentIndex() ):
+			for i in range(self.tabs.count()):
+				if self.tabs.isTabEnabled( i ):
+					self.tabs.setCurrentWidget(i)
+					break
+
+		current_tab = self.tabs.currentWidget()
+		if current_tab == self.info:
+			self.info.showInfo( item )
+		elif current_tab == self.table:
+			pass
+		elif current_tab == self.preview:
+			self.preview.load( item )
+
+
+	def showSqlWindow(self):
+		db = self.tree.currentDatabase()
 		if db == None:
 			QMessageBox.information(self, u"Sorry", u"No database selected or you are not connected.")
 			return
@@ -65,6 +87,9 @@ class DBManager(QMainWindow, Ui_DBManager):
 		dlg = DlgSqlWindow(self, db)
 		dlg.exec_()
 		self.emit( SIGNAL('reloadDatabase'), db)
+
+	def refreshDatabase(self):
+		pass
 
 
 	def registerAction(self, action, menu, callback):
@@ -89,4 +114,55 @@ class DBManager(QMainWindow, Ui_DBManager):
 			a.menu().removeAction( action )
 			return True
 		return False
+
+
+	def setupUi(self):
+		self.setWindowTitle("DB Manager")
+		self.setWindowIcon(QIcon(":/db_manager/icon"))
+		self.resize(QSize(700,500).expandedTo(self.minimumSizeHint()))
+
+		# create central tab widget
+		self.tabs = QTabWidget()
+		self.info = InfoViewer(self)
+		self.tabs.addTab(self.info, "Info")
+		self.table = QWidget(self)
+		self.tabs.addTab(self.table, "Table")
+		self.preview = LayerPreview(self)
+		self.tabs.addTab(self.preview, "Preview")
+		self.setCentralWidget(self.tabs)
+
+		# create database tree
+		self.dock = QDockWidget("Databases", self)
+		self.dock.setObjectName("DB_Manager_DBView")
+		self.dock.setFeatures(QDockWidget.DockWidgetMovable)
+		self.tree = DBTree(self)
+		self.dock.setWidget(self.tree)
+		self.addDockWidget(Qt.LeftDockWidgetArea, self.dock)
+
+		# create status bar
+		self.statusBar = QStatusBar(self)
+		self.setStatusBar(self.statusBar)		
+
+		# create menus
+		self.menuBar = QMenuBar(self)
+		self.menuDb = QMenu("&Database", self)
+		self.menuBar.addMenu(self.menuDb)
+		self.menuHelp = QMenu("&Help", self)
+		self.menuBar.addMenu(self.menuHelp)
+		self.setMenuBar(self.menuBar)
+
+		# create toolbar
+		self.toolBar = QToolBar(self)
+		self.toolBar.setObjectName("DB_Manager_ToolBar")
+		self.toolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+		self.addToolBar(self.toolBar)
+
+		# create menus' actions
+		self.actionRefresh = self.menuDb.addAction( QIcon(":/db_manager/refresh"), "&Refresh", self.refreshDatabase, QKeySequence("F5") )
+		self.actionSqlWindow = self.menuDb.addAction( QIcon(":/db_manager/sql_window"), "&SQL window", self.showSqlWindow, QKeySequence("F2") )
+		self.actionClose = self.menuDb.addAction( QIcon(), u"Exit", self.close, QKeySequence("CTRL+Q") )
+
+		# add actions to the toolbar
+		self.toolBar.addAction( self.actionRefresh )
+		self.toolBar.addAction( self.actionSqlWindow )
 

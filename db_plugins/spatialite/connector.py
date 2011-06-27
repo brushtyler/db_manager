@@ -44,9 +44,6 @@ class SpatiaLiteDBConnector(DBConnector):
 		self.__checkSpatial()
 		self.__checkGeometryColumnsTable()
 
-		# a counter to ensure that the cursor will be unique
-		self.last_cursor_id = 0
-
 	def __connectionInfo(self):
 		return '%s' % self.dbname
 	
@@ -179,15 +176,78 @@ class SpatiaLiteDBConnector(DBConnector):
 	
 	def getViewDefinition(self, view, schema=None):
 		""" returns definition of the view """
-		sql = u"SELECT sql FROM sqlite_master WHERE type = 'view' AND name = %s" % (self.quoteString(view))
+		sql = u"SELECT sql FROM sqlite_master WHERE type = 'view' AND name = %s" % self.quoteString(view)
 		c = self.connection.cursor()
 		self._exec_sql(c, sql)
 		return c.fetchone()[0]
 
 	def getSpatialRefInfo(self, srid):
+		sql = u"SELECT ref_sys_name FROM spatial_ref_sys WHERE srid = %s" % self.quoteString(srid)
 		c = self.connection.cursor()
-		self._exec_sql(c, u"SELECT ref_sys_name FROM spatial_ref_sys WHERE srid = %s" % self.quoteString(srid))
+		self._exec_sql(c, sql)
 		return c.fetchone()[0]
+
+
+	def createTable(self, table, fields, pkey=None, schema=None):
+		""" create ordinary table
+				'fields' is array containing instances of TableField
+				'pkey' contains name of column to be used as primary key
+		"""
+		if len(fields) == 0:
+			return False
+		
+		sql = u"CREATE TABLE %s (" % self.quoteId(table)
+		sql += u", ".join( map(lambda x: x.definition(), fields) )
+		if pkey:
+			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkey)
+		sql += ")"
+
+		self._exec_sql_and_commit(sql)
+		return True
+
+	def deleteTable(self, table, schema=None):
+		""" delete table from the database """
+		sql = u"DROP TABLE %s" % self.quoteId(table)
+		self._exec_sql_and_commit(sql)
+
+	def emptyTable(self, table, schema=None):
+		""" delete all rows from table """
+		sql = u"DELETE FROM %s" % self.quoteId(table)
+		self._exec_sql_and_commit(sql)
+		
+	def renameTable(self, table, new_table, schema=None):
+		""" rename a table """
+		if new_table == table:
+			return
+		c = self.connection.cursor()
+
+		sql = u"ALTER TABLE %s RENAME TO %s" % (self.quoteId(table), self.quoteId(new_table))
+		self._exec_sql(c, sql)
+		
+		# update geometry_columns
+		if self.has_geometry_columns:
+			sql = u"UPDATE geometry_columns SET f_table_name=%s WHERE f_table_name=%s" % (self.quoteString(new_table), self.quoteString(table))
+			self._exec_sql(c, sql)
+
+		self.connection.commit()
+
+	def moveTable(self, table, new_table, schema=None, new_schema=None):
+		self.renameTable(table, new_table)
+		
+	def createView(self, name, query, schema=None):
+		sql = u"CREATE VIEW %s AS %s" % (self.quoteId(name), query)
+		self._exec_sql_and_commit(sql)
+	
+	def deleteView(self, name, schema=None):
+		sql = u"DROP VIEW %s" % self.quoteId(name)
+		self._exec_sql_and_commit(sql)
+	
+	def renameView(self, name, new_name, schema=None):
+		""" rename view """
+		self.renameTable(name, new_name)
+
+	def hasCustomQuerySupport(self):
+		return True
 
 
 	def _exec_sql(self, cursor, sql):
@@ -221,6 +281,7 @@ class SpatiaLiteDBConnector(DBConnector):
 		except:
 			raise
 		return (model, secs, rowcount)
+
 
 class SLSqlTableModel(SqlTableModel):	
 	def __init__(self, cursor, parent=None):

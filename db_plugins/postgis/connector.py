@@ -49,9 +49,6 @@ class PostGisDBConnector(DBConnector):
 		self.__checkSpatial()
 		self.__checkGeometryColumnsTable()
 
-		# a counter to ensure that the cursor will be unique
-		self.last_cursor_id = 0
-
 	def __connectionInfo(self):
 		conn_str = u''
 		if self.host:   conn_str += "host='%s' "     % self.host
@@ -191,14 +188,13 @@ class PostGisDBConnector(DBConnector):
 
 	def getTableRowCount(self, table, schema=None):
 		c = self.connection.cursor()
-		table_name = self.quoteId( (schema, table) ) if schema != None else self.quoteId( table )
-		self._exec_sql( c, u"SELECT COUNT(*) FROM %s" % table_name )
+		self._exec_sql( c, u"SELECT COUNT(*) FROM %s" % self.quoteId( (schema, table) ) )
 		return c.fetchone()[0]
 
 	def getTableFields(self, table, schema=None):
 		""" return list of columns in table """
 		c = self.connection.cursor()
-		schema_where = u" AND nspname=%s " % self.quoteString(schema) if schema != None else ""
+		schema_where = u" AND nspname=%s " % self.quoteString(schema) if schema is not None else ""
 		sql = u"""SELECT a.attnum AS ordinal_position,
 				a.attname AS column_name,
 				t.typname AS data_type,
@@ -280,7 +276,8 @@ class PostGisDBConnector(DBConnector):
 		""" find out estimated extent (from the statistics) """
 		try:
 			c = self.connection.cursor()
-			extent = u"estimated_extent(%s,%s,%s)" % (self.quoteString(schema), self.quoteString(table), self.quoteString(geom))
+			schema_part = u"%s, " % self.quoteString(schema) if schema is not None else ""
+			extent = u"estimated_extent(%s,%s,%s)" % (schema_part, self.quoteString(table), self.quoteString(geom))
 			sql = u"""SELECT xmin(%(ext)s), ymin(%(ext)s), xmax(%(ext)s), ymax(%(ext)s) """ % { 'ext' : extent }
 			self._exec_sql(c, sql)
 			return c.fetchone()
@@ -316,6 +313,131 @@ class PostGisDBConnector(DBConnector):
 		except DbError, e:
 			return
 
+
+	def createTable(self, table, fields, pkey=None, schema=None):
+		""" create ordinary table
+				'fields' is array containing instances of TableField
+				'pkey' contains name of column to be used as primary key
+		"""
+		if len(fields) == 0:
+			return False
+
+		sql = "CREATE TABLE %s (" % self.quoteId( (schema, table) )
+		sql += u", ".join( map(lambda x: x.definition(), fields) )
+		if pkey:
+			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkey)
+		sql += ")"
+
+		self._exec_sql_and_commit(sql)
+		return True
+
+	def deleteTable(self, table, schema=None):
+		""" delete table and its reference in geometry_columns """
+		if self.has_spatial and self.has_geometry_columns and self.has_geometry_columns_access:
+			schema_part = u"'%s', " % self.quoteString(schema) if schema is not None else ""
+			sql = u"SELECT DropGeometryTable(%s%s)" % (schema_part, self.quoteString(table))
+		else:
+			sql = u"DROP TABLE %s" % self.quoteId( (schema, table) )
+		self._exec_sql_and_commit(sql)
+		
+	def emptyTable(self, table, schema=None):
+		""" delete all rows from table """
+		sql = u"TRUNCATE %s" % self.quoteId( (schema, table) )
+		self._exec_sql_and_commit(sql)
+
+	def renameTable(self, table, new_table, schema=None):
+		""" rename a table in database """
+		if new_table == table:
+			return
+		c = self.connection.cursor()
+
+		sql = u"ALTER TABLE %s RENAME TO %s" % (self.quoteId( (schema, table) ), self.quoteId(new_table))
+		self._exec_sql(c, sql)
+		
+		# update geometry_columns if postgis is enabled
+		if self.has_geometry_columns_access:
+			schema_where = u" AND f_table_schema=%s " % self.quoteString(schema) if schema is not None else ""
+			sql = u"UPDATE geometry_columns SET f_table_name=%s WHERE f_table_name=%s %s" % (self.quoteString(new_table), self.quoteString(table), schema_where)
+			self._exec_sql(c, sql)
+
+		self.connection.commit()
+
+	def moveTableToSchema(self, table, new_schema, schema=None):
+		if new_schema == schema:
+			return
+		c = self.connection.cursor()
+
+		sql = u"ALTER TABLE %s SET SCHEMA %s" % (self.quoteId( (schema, table) ), self.quoteId(new_schema))
+		self._exec_sql(c, sql)
+		
+		# update geometry_columns if postgis is enabled
+		if self.has_geometry_columns_access:
+			schema_where = u" AND f_table_schema=%s " % self.quoteString(schema) if schema is not None else ""
+			sql = u"UPDATE geometry_columns SET f_table_schema=%s WHERE f_table_name=%s %s" % (self.quoteString(new_schema), self.quoteString(table), schema_where)
+			self._exec_sql(c, sql)
+
+		self.connection.commit()
+
+	def moveTable(self, table, new_table, schema=None, new_schema=None):
+		if new_schema == schema and new_table == table: 
+			return
+		if new_schema == schema:
+			return self.renameTable(table, new_table, schema)
+		if new_table == table:
+			return self.moveTableToSchema(table, new_schema, schema)
+
+		c = self.connection.cursor()
+		t = u"__new_table__"
+
+		sql = u"ALTER TABLE %s RENAME TO %s" % (self.quoteId( (schema, table) ), self.quoteId(t))
+		self._exec_sql(c, sql)
+
+		sql = u"ALTER TABLE %s SET SCHEMA %s" % (self.quoteId( (schema, t) ), self.quoteId(new_schema))
+		self._exec_sql(c, sql)
+
+		sql = u"ALTER TABLE %s RENAME TO %s" % (self.quoteId( (new_schema, t) ), self.quoteId(table))
+		self._exec_sql(c, sql)
+
+		# update geometry_columns if postgis is enabled
+		if self.has_geometry_columns_access:
+			schema_where = u" f_table_schema=%s AND " % self.quoteString(schema) if schema is not None else ""
+			schema_part = u" f_table_schema=%s, " % self.quoteString(schema) if schema is not None else ""
+			sql = u"UPDATE geometry_columns SET %s f_table_name=%s WHERE %s f_table_name=%s" % (schema_part, self.quoteString(new_schema), self.quoteString(new_table), schema_where, self.quoteString(table))
+			self._exec_sql(c, sql)
+
+		self.connection.commit()
+		
+	def createView(self, name, query, schema=None):
+		sql = u"CREATE VIEW %s AS %s" % (self.quoteId( (schema, table) ), query)
+		self._exec_sql_and_commit(sql)
+	
+	def deleteView(self, name, schema=None):
+		sql = u"DROP VIEW %s" % self.quoteId( (schema, table) )
+		self._exec_sql_and_commit(sql)
+	
+	def renameView(self, name, new_name, schema=None):
+		""" rename view in database """
+		self.renameTable(name, new_name, schema)
+		
+	def createSchema(self, schema):
+		""" create a new empty schema in database """
+		sql = u"CREATE SCHEMA %s" % self.quoteId(schema)
+		self._exec_sql_and_commit(sql)
+		
+	def deleteSchema(self, schema):
+		""" drop (empty) schema from database """
+		sql = u"DROP SCHEMA %s" % self.quoteId(schema)
+		self._exec_sql_and_commit(sql)
+		
+	def renameSchema(self, schema, new_schema):
+		""" rename a schema in database """
+		sql = u"ALTER SCHEMA %s RENAME TO %s" % (self.quoteId(schema), self.quoteId(new_schema))
+		self._exec_sql_and_commit(sql)
+
+
+	def hasCustomQuerySupport(self):
+		return True
+
 		
 	def _exec_sql(self, cursor, sql):
 		try:
@@ -347,6 +469,7 @@ class PostGisDBConnector(DBConnector):
 		except:
 			raise
 		return (model, secs, rowcount)
+
 
 class PGSqlTableModel(SqlTableModel):
 	def __init__(self, cursor, parent=None):

@@ -44,13 +44,15 @@ class DBManagerPlugin:
 			self.dlg.close()
 
 	def run(self):
+		# keep opened only one instance 
 		if self.dlg == None:
 			from db_manager import DBManager
 			self.dlg = DBManager(self.iface, self.iface.mainWindow())
 			QObject.connect(self.dlg, SIGNAL("destroyed(QObject *)"), self.onDestroyed)
 		self.dlg.show()
+		self.dlg.raise_()
+		self.dlg.activateWindow()
 
 	def onDestroyed(self, obj):
-		print ">>>>>> destroyed"
 		self.dlg = None
 

@@ -54,14 +54,14 @@ class DbError(Exception):
 		return msg.encode('utf-8')
 
 
-class DBPlugin:
-	def __init__(self, conn_name):
+class DBPlugin(QObject):
+	def __init__(self, conn_name, parent=None):
+		QObject.__init__(self, parent)
 		self.connName = conn_name
 		self.db = None
 
 	def __del__(self):
 		print "DBPlugin.__del__", self.connName
-		self.db = None
 
 	def connectionName(self):
 		return self.connName
@@ -103,7 +103,10 @@ class DBPlugin:
 		return conn_list
 
 
-class Item:
+class Item(QObject):
+	def __init__(self, parent=None):
+		QObject.__init__(self, parent)
+
 	def database(self):
 		return None
 
@@ -121,19 +124,17 @@ class Item:
 
 class Database(Item):
 	def __init__(self, connection, connector):
-		self.connection = connection
+		QObject.__init__(self, connection)
 		self.connector = connector
 
-	def __del__(self):
-		print "Database.__del__", self.connection.connectionName()
-		self.connection = None
-		self.connector = None
-
-	def connectionDetails(self):
-		return []
+	def connection(self):
+		return self.parent()
 
 	def database(self):
 		return self
+
+	def connectionDetails(self):
+		return []
 
 	def schemas(self):
 		return None
@@ -143,56 +144,33 @@ class Database(Item):
 
 
 
-class DatabaseSubItem(Item):
+class Schema(Item):
 	def __init__(self, db):
-		self._db = db
-
-	def __del__(self):
-		print "DatabaseSubItem.__del__", self
-		self._db = None
-
-	def database(self):
-		return self._db
-
-
-class Schema(DatabaseSubItem):
-	def __init__(self, db):
-		DatabaseSubItem.__init__(self, db)
+		Item.__init__(self, db)
 		self.oid = self.name = self.owner = self.perms = None
 		self.tableCount = 0
 
-	def __del__(self):
-		print "Schema.__del__", self.name
+	def database(self):
+		return self.parent()
 
 	def tables(self):
-		return self._db.tables(self)
+		return self.parent().tables(self)
 
 
-class SchemaSubItem(Item):
-	def __init__(self, schema):
+class Table(Item):
+	def __init__(self, db, schema=None, parent=None):
+		Item.__init__(self, db)
 		self._schema = schema
-
-	def __del__(self):
-		print "SchemaSubItem.__del__", self
-		self._schema = None
-
-	def schema(self):
-		return self._schema
-
-
-class Table(DatabaseSubItem, SchemaSubItem):
-	def __init__(self, db, schema=None):
-		DatabaseSubItem.__init__(self, db)
-		SchemaSubItem.__init__(self, schema)
 		self.name = self.isView = self.owner = self.pages = self.geomCol = self.geomType = self.geomDim = self.srid = None
 		self.rowCount = None
 
 		self._fields = self._indexes = self._triggers = None
 
-	def __del__(self):
-		print "Table.__del__", self.name
-		self._db = None
-		self._schema = None
+	def database(self):
+		return self.parent()
+
+	def schema(self):
+		return self._schema
 
 	def fields(self):
 		return self._fields
@@ -204,10 +182,55 @@ class Table(DatabaseSubItem, SchemaSubItem):
 		return self._triggers
 
 
+	def spatialInfo(self):
+		if self.geomType == None:
+			return []
+
+		ret = [
+			("Column:", self.geomColumn),
+			("Geometry:", self.geomType)
+		]
+
+		# only if we have info from geometry_columns
+		if self.geomDim:
+			ret.append( ("Dimension:", self.geomDim) )
+			sr_info = self.database().connector.getSpatialRefInfo(self.srid) if self.srid != -1 else "Undefined"
+			if sr_info: ret.append( ("Spatial ref:", "%s (%d)" % (sr_info, self.srid)) )
+
+		# estimated extent
+		if not self.isView:
+			extent = self.database().connector.getTableEstimatedExtent(self.geomColumn, self.name, self.schema().name if self.schema() else None)
+			if extent != None and extent[0] != None:
+				extent = '%.5f, %.5f - %.5f, %.5f' % extent
+			else:
+				extent = '(unknown)'
+			ret.append( ("Extent:", extent) )
+
+		# is there an entry in geometry_columns?
+		if self.geomType.lower() == 'geometry':
+			ret.append( u"\n<warning>There isn't entry in geometry_columns!" )
+
+		# find out whether the geometry column has spatial index on it
+		if not self.isView:
+			has_spatial_index = False
+			for fld in self.fields():
+				if fld.name == self.geomColumn:
+					for idx in self.indexes():
+						if fld.num in idx.columns:
+							has_spatial_index = True
+							break
+					break
+
+			if not has_spatial_index:
+				ret.append( u'\n<warning>No spatial index defined.' )
+
+		return ret
+
+
 	def runAction(self, action):
 		if action == "rows/count":
 			try:
-				self.rowCount = self._db.connector.getTableRowCount(self.name, self._schema.name if self._schema else None)
+				self.rowCount = self.database().connector.getTableRowCount(self.name, self._schema.name if self._schema else None)
 				self.rowCount = int(self.rowCount) if self.rowCount != None else None
 			except:
 				self.rowCount = "Unknown"
@@ -228,7 +251,17 @@ class TableSubItem:
 class TableField(TableSubItem):
 	def __init__(self, table):
 		TableSubItem.__init__(self, table)
-		self.num = self.name = self.dataType = self.notNull = self.default = self.hasDefault = self.primaryKey = None
+		self.num = self.name = self.dataType = self.modifier = self.notNull = self.default = self.hasDefault = self.primaryKey = None
+
+	def definition(self):
+		name = self._table.database().quoteId(self.name)
+		data_type = u"%s(%s)" % (self.dataType, self.modifier) if self.modifier is not None else u"%s" % self.dataType
+		not_null = "NOT NULL" if self.notNull else ""
+
+		txt = u"%s %s %s" % (name, data_type, not_null)
+		if self.hasDefault:
+			txt += u" DEFAULT %s" % (self.default if self.default is not None else "NULL")
+		return txt
 
 
 class TableConstraint(TableSubItem):

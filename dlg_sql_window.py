@@ -21,7 +21,13 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 		self.connect(self.btnExecute, SIGNAL("clicked()"), self.executeSql)
 		self.connect(self.btnClear, SIGNAL("clicked()"), self.clearSql)
 		self.connect(self.buttonBox.button(QDialogButtonBox.Close), SIGNAL("clicked()"), self.close)
-		
+
+		# hide the load query as layer if feature is not supported
+		loadAsLayerSupported = False and self.db.hasCustomQuerySupport()	# not implemented yet
+		self.loadAsLayerGroup.setVisible( loadAsLayerSupported )
+		if loadAsLayerSupported:
+			self.connect(self.loadAsLayerGroup, SIGNAL("toggled(bool)"), self.loadAsLayerToggled)
+			self.loadAsLayerToggled(False)
 		
 	def closeEvent(self, e):
 		""" save window state """
@@ -29,6 +35,10 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 		settings.setValue("/PostGIS_Manager/sql_geometry", QVariant(self.saveGeometry()))
 		
 		QDialog.closeEvent(self, e)
+
+	def loadAsLayerToggled(self, checked):
+		self.loadAsLayerGroup.setChecked( checked )
+		self.loadAsLayerWidget.setVisible( checked )
 		
 	def clearSql(self):
 		self.editSql.setPlainText(QString())

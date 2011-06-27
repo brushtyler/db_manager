@@ -25,7 +25,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from .db_plugins import supportedDbTypes, createDbPlugin
-from .db_plugins.plugin import *
+from .db_plugins.plugin import InvalidDataException, ConnectionError
 
 try:
 	from . import resources_rc
@@ -36,23 +36,14 @@ class TreeItem(QObject):
 	def __init__(self, data, parent=None):
 		QObject.__init__(self, parent)
 		self.populated = True
-		self.parentItem = parent
 		self.itemData = data
 		self.childItems = []
-		if parent:
+		if parent: 
 			parent.appendChild(self)
 
-	def __del__(self):
-		print "TreeItem.__del__", self, self.data(0)
-		self.itemData = None
+	def populate(self):
+		return False
 
-	def deleteChildren(self):
-		for c in self.childItems:
-			c.parentItem = None
-			c.deleteChildren()
-
-	def populate(self, index):
-		self.emit( SIGNAL("startToPopulate"), index )
 
 	def getItemData(self):
 		return self.itemData
@@ -70,17 +61,14 @@ class TreeItem(QObject):
 		return 1
 	
 	def row(self):
-		if self.parentItem:
-			for row, item in enumerate(self.parentItem.childItems):
+		if self.parent():
+			for row, item in enumerate(self.parent().childItems):
 				if item is self:
 					return row
 		return 0
 
 	def data(self, column):
 		return "" if column == 0 else None
-	
-	def parent(self):
-		return self.parentItem
 	
 	def icon(self):
 		return None
@@ -107,14 +95,13 @@ class ConnectionItem(TreeItem):
 	def __init__(self, connection, parent=None):
 		TreeItem.__init__(self, connection, parent)
 		self.populated = False
-		self.connect( self, SIGNAL("startToPopulate"), self.__populate)
 
 	def data(self, column):
 		if column == 0:
 			return self.getItemData().connectionName()
 		return None
 
-	def __populate(self, index):
+	def populate(self):
 		if self.populated:
 			return True
 
@@ -127,6 +114,7 @@ class ConnectionItem(TreeItem):
 			QMessageBox.warning( None, u"Unable to connect", unicode(e) )
 			return False
 
+		QApplication.setOverrideCursor(Qt.WaitCursor)
 		schemas = connection.db.schemas()
 		if schemas != None:
 			for s in schemas:
@@ -137,7 +125,7 @@ class ConnectionItem(TreeItem):
 				TableItem(t, self)
 
 		self.populated = True
-		self.emit( SIGNAL("populated"), index )
+		QApplication.restoreOverrideCursor()
 		return True
 
 
@@ -145,7 +133,6 @@ class SchemaItem(TreeItem):
 	def __init__(self, schema, parent):
 		TreeItem.__init__(self, schema, parent)
 		self.populated = False
-		self.connect( self, SIGNAL("startToPopulate"), self.__populate)
 
 		# load (shared) icon with first instance of schema item
 		if not hasattr(SchemaItem, 'schemaIcon'):
@@ -159,15 +146,16 @@ class SchemaItem(TreeItem):
 	def icon(self):
 		return self.schemaIcon
 	
-	def __populate(self, index):
+	def populate(self):
 		if self.populated:
 			return True
 
+		QApplication.setOverrideCursor(Qt.WaitCursor)
 		for t in self.getItemData().tables():
 			TableItem(t, self)
 
 		self.populated = True
-		self.emit( SIGNAL("populated"), index )
+		QApplication.restoreOverrideCursor()
 		return True
 
 
@@ -216,11 +204,6 @@ class DBModel(QAbstractItemModel):
 		for dbtype in supportedDbTypes():
 			dbpluginclass = createDbPlugin( dbtype )
 			PluginItem( dbpluginclass, self.rootItem )
-
-	def __del__(self):
-		print "DBModel.__del__"
-		self.rootItem.deleteChildren()
-		self.rootItem = None
 
 	def getItem(self, index):
 		if not index.isValid():
@@ -286,11 +269,8 @@ class DBModel(QAbstractItemModel):
 
 	def rowCount(self, parent):
 		parentItem = parent.internalPointer() if parent.isValid() else self.rootItem
-		if not parentItem.populated:
-			self.connect( parentItem, SIGNAL('populated'), self._onDataChanged )
-			parentItem.populate( parent )
-		else:
-			self.disconnect( parentItem, SIGNAL('populated'), self._onDataChanged )
+		if not parentItem.populated and parentItem.populate():
+			self._onDataChanged( parent )
 		return parentItem.childCount()
 
 	def hasChildren(self, parent):

@@ -23,7 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from .db_plugins.plugin import *
+from .db_plugins.plugin import DBPlugin, Schema, Table
 
 class InfoViewer(QTextBrowser):
 
@@ -195,7 +195,7 @@ class InfoViewer(QTextBrowser):
 		if spatial_info == None:
 			pass
 		else:
-			html += u'<h2>%s</h2>' % table.database().connection.typeNameString()
+			html += u'<h2>%s</h2>' % table.database().connection().typeNameString()
 			html += '<div>'
 			if len(spatial_info) <= 0:
 				html += u'<warning>This is not a spatial table.'

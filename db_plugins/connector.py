@@ -30,9 +30,12 @@ class DBConnector:
 
 	def __del__(self):
 		print "DBConnector.__del__", self.uri.uri()
-		if self.connection != None:
+		if self.connection != None: 
 			self.connection.close()
-			self.connection = None
+		self.connection = None
+
+	def hasCustomQuerySupport(self):
+		return False
 
 	def quoteId(self, identifier):
 		if hasattr(identifier, '__iter__'):
@@ -42,13 +45,21 @@ class DBConnector:
 					continue
 				ids.append( self.quoteId(i) )
 			return u'.'.join( ids )
-			
-		identifier = unicode(identifier) # make sure it's python unicode string
+
+		identifier = unicode(identifier) if identifier != None else unicode() # make sure it's python unicode string
 		return u'"%s"' % identifier.replace('"', '""')
 	
 	def quoteString(self, txt):
 		""" make the string safe - replace ' with '' """
-		txt = unicode(txt) # make sure it's python unicode string
+		if hasattr(txt, '__iter__'):
+			txts = list()
+			for i in txt:
+				if i == None:
+					continue
+				txts.append( self.quoteString(i) )
+			return u'.'.join( txts )
+
+		txt = unicode(txt) if txt != None else unicode() # make sure it's python unicode string
 		return u"'%s'" % txt.replace("'", "''")
 
 
@@ -84,3 +95,4 @@ class SqlTableModel(QAbstractTableModel):
 		else:
 			# header for a column
 			return QVariant(self.header[section])
+

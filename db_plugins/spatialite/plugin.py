@@ -23,7 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..plugin import *
+from ..plugin import DBPlugin, Database, Table, TableField, TableConstraint, TableIndex
 try:
 	from . import resources_rc
 except ImportError:
@@ -93,9 +93,6 @@ class SLDatabase(Database):
 
 		return ret
 
-	def privilegesDetails(self):
-		return None
-
 	def generalInfo(self):
 		info = self.connector.getInfo()
 		return [
@@ -120,58 +117,17 @@ class SLTable(Table):
 			("Rows:", self.rowCount) 
 		]
 
-	def spatialInfo(self):
-		if self.geomType == None:
-			return []
-
-		ret = [
-			("Column:", self.geomColumn),
-			("Geometry:", self.geomType)
-		]
-
-		if self.geomDim: # only if we have info from geometry_columns
-			ret.append( ("Dimension:", self.geomDim) )
-			sr_info = self._db.connector.getSpatialRefInfo(self.srid) if self.srid != -1 else "Undefined"
-			if sr_info: ret.append( ("Spatial ref:", "%s (%d)" % (sr_info, self.srid)) )
-
-		if not self.isView:
-			# estimated extent
-			extent = self._db.connector.getTableEstimatedExtent(self.geomColumn, self.name, self.schema().name if self.schema() else None)
-			if extent != None and extent[0] != None:
-				extent = '%.5f, %.5f - %.5f, %.5f' % extent
-			else:
-				extent = '(unknown)'
-			ret.append( ("Extent:", extent) )
-
-		if self.geomType.lower() == 'geometry':
-			ret.append( u"\n<warning>There isn't entry in geometry_columns!" )
-
-		if not self.isView:
-			# find out whether the geometry column has spatial index on it
-			has_spatial_index = False
-			for fld in self.fields():
-				if fld.name == self.geomColumn:
-					for idx in self.indexes():
-						if fld.num in idx.columns:
-							has_spatial_index = True
-							break
-					break
-
-			if not has_spatial_index:
-				ret.append( u'\n<warning>No spatial index defined.' )
-
-		return ret
 
 	def fieldsDetails(self):
 		pass
 
 
 	def fields(self):
-		return map(lambda x: SLTableField(x, self), self._db.connector.getTableFields(self.name))
+		return map(lambda x: SLTableField(x, self), self.database().connector.getTableFields(self.name))
 
 	def indexes(self):
 		if self._indexes == None:
-			self._indexes = map(lambda x: SLTableIndex(x, self), self._db.connector.getTableIndexes(self.name))
+			self._indexes = map(lambda x: SLTableIndex(x, self), self.database().connector.getTableIndexes(self.name))
 		return self._indexes
 
 
@@ -180,6 +136,7 @@ class SLTableField(TableField):
 		TableField.__init__(self, table)
 		self.num, self.name, self.dataType, self.notNull, self.default, self.primaryKey = row
 		self.hasDefault = self.default != None
+
 
 class SLTableIndex(TableIndex):
 	def __init__(self, row, table):

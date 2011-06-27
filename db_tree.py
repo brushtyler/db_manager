@@ -29,6 +29,7 @@ class DBTree(QTreeView):
 	def __init__(self, parent=None):
 		QTreeView.__init__(self, parent)
 		self.setModel( DBModel(self) )
+		self.setHeaderHidden(True)
 
 		self.connect(self.selectionModel(), SIGNAL("currentChanged(const QModelIndex&, const QModelIndex&)"), self.itemChanged)
 		self.connect(self, SIGNAL("expanded(const QModelIndex&)"), self.itemChanged)
@@ -50,6 +51,7 @@ class DBTree(QTreeView):
 			return None
 
 	def itemChanged(self, indexFrom, indexTo=None):
-		self.setCurrentIndex(indexFrom)
-		self.emit( SIGNAL('currentChanged'), self.currentItem() )
+		if indexFrom != self.currentIndex():
+			self.setCurrentIndex(indexFrom)
+			self.emit( SIGNAL('currentChanged'), self.currentItem() )
 

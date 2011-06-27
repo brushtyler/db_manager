@@ -23,7 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..plugin import *
+from ..plugin import DBPlugin, Database, Schema, Table, TableField, TableConstraint, TableIndex
 try:
 	from . import resources_rc
 except ImportError:
@@ -147,7 +147,7 @@ class PGSchema(Schema):
 		return info
 
 	def privilegesDetails(self):
-		details = self._db.connector.getSchemaPrivileges(self.name)
+		details = self.database().connector.getSchemaPrivileges(self.name)
 		ret = []
 		if details[0]: ret.append("create new objects")
 		if details[1]: ret.append("access objects")
@@ -176,77 +176,41 @@ class PGTable(Table):
 			ret.append( ("Rows (counted):", self.rowCount if self.rowCount != None else 'Unknown (<a href="action:rows/count">find out</a>)') )
 
 		# privileges
-		schema_priv = self._schema.privilegesDetails() if self._schema else None
 		# has the user access to this schema?
+		schema_priv = self._schema.privilegesDetails() if self._schema else None
 		if schema_priv == None:
 			pass
 		elif len(schema_priv) <= 0:
-			priv_string += "<warning> This user doesn't have usage privileges for this schema!"
+			priv_string = u"<warning> This user doesn't have usage privileges for this schema!"
+			ret.append( ("Privileges:", priv_string ) )
 		else:
-			table_priv = self._db.connector.getTablePrivileges(self.name, self._schema.name if self._schema else None)
-			privileges = []
-			if table_priv[0]: privileges.append("select")
-			if table_priv[1]: privileges.append("insert")
-			if table_priv[2]: privileges.append("update")
-			if table_priv[3]: privileges.append("delete")
+			privileges = self.privilegesDetails()
 			priv_string = u", ".join(privileges) if len(privileges) > 0 else u'<warning> This user has no privileges!'
-		ret.append( ("Privileges:", priv_string ) )
+			ret.append( ("Privileges:", priv_string ) )
 
-		if table_priv[0] and not table_priv[1] and not table_priv[2] and not table_priv[3]:
-			ret.append( (u'\n<warning> This user has read-only privileges.') )
-
+			if table_priv[0] and not table_priv[1] and not table_priv[2] and not table_priv[3]:
+				ret.append( (u'\n<warning> This user has read-only privileges.') )
 
 		if not self.isView:
 			if self.rowCount != None and (self.estimatedRowCount > 2 * self.rowCount or self.estimatedRowCount * 2 < self.rowCount):
 				ret.append( (u"\n<warning> There's a significant difference between estimated and real row count. \n" \
 					"Consider running VACUUM ANALYZE.") )
 
+		if not self.isView:
 			if len( filter(lambda fld: fld.primaryKey, self.fields()) ) <= 0:
 				ret.append( (u"\n<warning> No primary key defined for this table!") )
 
 		return ret
 
-	def spatialInfo(self):
-		if self.geomType == None:
-			return []
-
-		ret = [
-			("Column:", self.geomColumn),
-			("Geometry:", self.geomType)
-		]
-
-		if self.geomDim: # only if we have info from geometry_columns
-			ret.append( ("Dimension:", self.geomDim) )
-			sr_info = self._db.connector.getSpatialRefInfo(self.srid) if self.srid != -1 else "Undefined"
-			if sr_info: ret.append( ("Spatial ref:", "%s (%d)" % (sr_info, self.srid)) )
-
-		if not self.isView:
-			# estimated extent
-			extent = self._db.connector.getTableEstimatedExtent(self.geomColumn, self.name, self.schema().name if self.schema() else None)
-			if extent != None and extent[0] != None:
-				extent = '%.5f, %.5f - %.5f, %.5f' % extent
-			else:
-				extent = '(unknown)'
-			ret.append( ("Extent:", extent) )
-
-		if self.geomType.lower() == 'geometry':
-			ret.append( u"\n<warning>There isn't entry in geometry_columns!" )
-
-		if not self.isView:
-			# find out whether the geometry column has spatial index on it
-			has_spatial_index = False
-			for fld in self.fields():
-				if fld.name == self.geomColumn:
-					for idx in self.indexes():
-						if fld.num in idx.columns:
-							has_spatial_index = True
-							break
-					break
-
-			if not has_spatial_index:
-				ret.append( u'\n<warning>No spatial index defined.' )
-
+	def privilegesDetails(self):
+		details = self.database().connector.getTablePrivileges(self.name, self._schema.name if self._schema else None)
+		ret = []
+		if details[0]: ret.append("select")
+		if details[1]: ret.append("insert")
+		if details[1]: ret.append("update")
+		if details[1]: ret.append("delete")
 		return ret
+
 
 	def fieldsDetails(self):
 		pass
@@ -254,17 +218,17 @@ class PGTable(Table):
 
 	def fields(self):
 		if self._fields == None:
-			self._fields = map(lambda x: PGTableField(x, self), self._db.connector.getTableFields(self.name, self.schema().name if self.schema() else None))
+			self._fields = map(lambda x: PGTableField(x, self), self.database().connector.getTableFields(self.name, self.schema().name if self.schema() else None))
 		return self._fields
 
 	def constraints(self):
 		if self._constraints == None:
-			self._constraints = map(lambda x: PGTableConstraint(x, self), self._db.connector.getTableConstraints(self.name, self.schema().name if self.schema() else None))
+			self._constraints = map(lambda x: PGTableConstraint(x, self), self.database().connector.getTableConstraints(self.name, self.schema().name if self.schema() else None))
 		return self._constraints
 
 	def indexes(self):
 		if self._indexes == None:
-			self._indexes = map(lambda x: PGTableIndex(x, self), self._db.connector.getTableIndexes(self.name, self.schema().name if self.schema() else None))
+			self._indexes = map(lambda x: PGTableIndex(x, self), self.database().connector.getTableIndexes(self.name, self.schema().name if self.schema() else None))
 		return self._indexes
 
 
@@ -279,6 +243,7 @@ class PGTableField(TableField):
 			if con.type == PGTableConstraint.TypePrimaryKey and self.num in con.columns:
 				self.primaryKey = True
 				break
+
 
 class PGTableConstraint(TableConstraint):
 	def __init__(self, row, table):
