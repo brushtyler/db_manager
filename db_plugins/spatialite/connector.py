@@ -95,19 +95,20 @@ class SpatiaLiteDBConnector(DBConnector):
 		"""
 		c = self.connection.cursor()
 
-		sys_tables = ['sqlite_stat1']
-		# get the R*Tree tables
-		sql = u"SELECT f_table_name, f_geometry_column FROM geometry_columns WHERE spatial_index_enabled = 1"
-		self._exec_sql(c, sql)		
-		for idx_item in c.fetchall():
-			sys_tables.append( 'idx_%s_%s' % idx_item )
-			sys_tables.append( 'idx_%s_%s_node' % idx_item )
-			sys_tables.append( 'idx_%s_%s_parent' % idx_item )
-			sys_tables.append( 'idx_%s_%s_rowid' % idx_item )
-
 		items = []
-		# get geometry info from geometry_columns if exists
+		sys_tables = ['sqlite_stat1']
+
 		if self.has_geometry_columns:
+			# get the R*Tree tables
+			sql = u"SELECT f_table_name, f_geometry_column FROM geometry_columns WHERE spatial_index_enabled = 1"
+			self._exec_sql(c, sql)		
+			for idx_item in c.fetchall():
+				sys_tables.append( 'idx_%s_%s' % idx_item )
+				sys_tables.append( 'idx_%s_%s_node' % idx_item )
+				sys_tables.append( 'idx_%s_%s_parent' % idx_item )
+				sys_tables.append( 'idx_%s_%s_rowid' % idx_item )
+
+			# get geometry info from geometry_columns if exists
 			sql = u"""SELECT m.name, m.type = 'view', g.f_geometry_column, g.type, g.coord_dimension, g.srid 
 							FROM sqlite_master AS m LEFT JOIN geometry_columns AS g ON lower(m.name) = lower(g.f_table_name)
 							WHERE m.type in ('table', 'view') 
@@ -248,6 +249,14 @@ class SpatiaLiteDBConnector(DBConnector):
 
 	def hasCustomQuerySupport(self):
 		return True
+
+	def fieldTypes(self):
+		return [
+			"integer", "bigint", "smallint", # integers
+			"real", "double", "float", "numeric", # floats
+			"varchar(n)", "character(n)", "text", # strings
+			"date", "datetime" # date/time
+		]
 
 
 	def _exec_sql(self, cursor, sql):

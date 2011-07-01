@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'ui/DlgSqlWindow.ui'
 #
-# Created: Sun Jun 26 01:30:30 2011
+# Created: Fri Jul  1 00:59:20 2011
 #      by: PyQt4 UI code generator 4.8.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -115,7 +115,7 @@ class Ui_DlgSqlWindow(object):
         self.label_5.setObjectName(_fromUtf8("label_5"))
         self.horizontalLayout_7.addWidget(self.label_5)
         self.layerNameEdit = QtGui.QLineEdit(self.loadAsLayerWidget)
-        self.layerNameEdit.setEnabled(False)
+        self.layerNameEdit.setEnabled(True)
         self.layerNameEdit.setText(_fromUtf8(""))
         self.layerNameEdit.setObjectName(_fromUtf8("layerNameEdit"))
         self.horizontalLayout_7.addWidget(self.layerNameEdit)

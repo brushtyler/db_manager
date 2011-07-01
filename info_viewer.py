@@ -164,31 +164,32 @@ class InfoViewer(QTextBrowser):
 			html += '</div>'
 			
 
-		# permissions
-		priv_details = table.privilegesDetails()
-		if priv_details ==  None:
-			pass
-		else:
-			html += '<h2>Privileges</h2>'
-			html += '<div>'
-
-			# has the user access to this schema?
-			schema_priv = table.schema().privilegesDetails() if table.schema() else None
-			if schema_priv == None:
+		if False:
+			# permissions
+			priv_details = table.privilegesDetails()
+			if priv_details ==  None:
 				pass
 			else:
-				if len(schema_priv) <= 0:
-					html += '<div><warning>This user doesn\'t have usage privileges for this schema!</div>'
+				html += '<h2>Privileges</h2>'
+				html += '<div>'
 
-			if len(priv_details) <= 0:
-				html += '<warning>This user has no privileges!'
-			else:
-				html += "User has privileges:"
-				html += '<ul>'
-				for row in priv_details:
-					html += u"<li>%s" % (row)
-				html += "</ul>"
-			html += "</div>"
+				# has the user access to this schema?
+				schema_priv = table.schema().privilegesDetails() if table.schema() else None
+				if schema_priv == None:
+					pass
+				else:
+					if len(schema_priv) <= 0:
+						html += '<div><warning>This user doesn\'t have usage privileges for this schema!</div>'
+
+				if len(priv_details) <= 0:
+					html += '<warning>This user has no privileges!'
+				else:
+					html += "User has privileges:"
+					html += '<ul>'
+					for row in priv_details:
+						html += u"<li>%s" % (row)
+					html += "</ul>"
+				html += "</div>"
 
 		# spatial info
 		spatial_info = table.spatialInfo()

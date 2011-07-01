@@ -51,6 +51,8 @@ class SpatiaLiteDBPlugin(DBPlugin):
 	def connectionSettingsKey(self):
 		return '/SpatiaLite/connections'
 
+	def databasesFactory(self, connection, uri):
+		return SLDatabase(connection, uri)
 
 	def connect(self, parent=None):
 		conn_name = self.connectionName()
@@ -63,16 +65,19 @@ class SpatiaLiteDBPlugin(DBPlugin):
 		database = unicode(settings.value("sqlitepath").toString())
 
 		import qgis.core
-		from .connector import SpatiaLiteDBConnector
 		uri = qgis.core.QgsDataSourceURI()
 		uri.setDatabase(database)
-		self.db = SLDatabase( self, SpatiaLiteDBConnector(uri) )
+		self.db = self.databasesFactory( self, uri )
 		return True
 
 
 class SLDatabase(Database):
-	def __init__(self, connection, connector):
-		Database.__init__(self, connection, connector)
+	def __init__(self, connection, uri):
+		Database.__init__(self, connection, uri)
+
+	def connectorsFactory(self, uri):
+		from .connector import SpatiaLiteDBConnector
+		return SpatiaLiteDBConnector(uri)
 
 	def connectionDetails(self):
 		return [ 
@@ -99,8 +104,12 @@ class SLDatabase(Database):
 			("SQLite version", info[0])
 		]
 
-	def tables(self, schema=None):
-		return map(lambda x: SLTable(x, self), self.connector.getTables())
+
+	def schemasFactory(self, row, db):
+		return None
+
+	def tablesFactory(self, row, db, schema=None):
+		return SLTable(row, db, schema)
 
 
 class SLTable(Table):
@@ -119,16 +128,17 @@ class SLTable(Table):
 
 
 	def fieldsDetails(self):
-		pass
+		pass	# not implemented yet
 
 
-	def fields(self):
-		return map(lambda x: SLTableField(x, self), self.database().connector.getTableFields(self.name))
+	def tableFieldsFactory(self, row, table):
+		return SLTableField(row, table)
 
-	def indexes(self):
-		if self._indexes == None:
-			self._indexes = map(lambda x: SLTableIndex(x, self), self.database().connector.getTableIndexes(self.name))
-		return self._indexes
+	def tableConstraintsFactory(self, row, table):
+		return None
+
+	def tableIndexesFactory(self, row, table):
+		return SLTableIndex(row, table)
 
 
 class SLTableField(TableField):

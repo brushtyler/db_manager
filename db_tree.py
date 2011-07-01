@@ -47,11 +47,10 @@ class DBTree(QTreeView):
 		if item == None: return
 		try:
 			return item.database()
-		except TypeError:
+		except TypeError:	# it's a DBPlugin class object, no database
 			return None
 
 	def itemChanged(self, indexFrom, indexTo=None):
-		if indexFrom != self.currentIndex():
-			self.setCurrentIndex(indexFrom)
-			self.emit( SIGNAL('currentChanged'), self.currentItem() )
+		self.setCurrentIndex(indexFrom)
+		self.emit( SIGNAL('currentChanged'), self.currentItem() )
 

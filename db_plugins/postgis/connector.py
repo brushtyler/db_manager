@@ -438,6 +438,15 @@ class PostGisDBConnector(DBConnector):
 	def hasCustomQuerySupport(self):
 		return True
 
+	def fieldTypes(self):
+		return [
+			"integer", "bigint", "smallint", # integers
+			"serial", "bigserial", # auto-incrementing ints
+			"real", "double precision", "numeric", # floats
+			"varchar", "varchar(n)", "char(n)", "text", # strings
+			"date", "time", "timestamp" # date/time
+		]
+
 		
 	def _exec_sql(self, cursor, sql):
 		try:

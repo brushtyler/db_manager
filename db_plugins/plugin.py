@@ -103,6 +103,10 @@ class DBPlugin(QObject):
 		return conn_list
 
 
+	def databasesFactory(self, connection, uri):
+		return None
+
+
 class Item(QObject):
 	def __init__(self, parent=None):
 		QObject.__init__(self, parent)
@@ -122,10 +126,14 @@ class Item(QObject):
 	def runAction(self):
 		pass
 
+
 class Database(Item):
-	def __init__(self, connection, connector):
-		QObject.__init__(self, connection)
-		self.connector = connector
+	def __init__(self, dbplugin, uri):
+		QObject.__init__(self, dbplugin)
+		self.connector = self.connectorsFactory( uri )
+
+	def connectorsFactory(self, uri):
+		return None
 
 	def connection(self):
 		return self.parent()
@@ -136,12 +144,24 @@ class Database(Item):
 	def connectionDetails(self):
 		return []
 
+
+	def schemasFactory(self, row, db):
+		return None
+
 	def schemas(self):
+		schemas = self.connector.getSchemas()
+		if schemas == None:
+			return None
+		return map(lambda x: self.schemasFactory(x, self), schemas)
+
+	def tablesFactory(self, row, db, schema=None):
 		return None
 
 	def tables(self, schema=None):
-		return None
-
+		tables = self.connector.getTables(schema.name if schema else None)
+		if tables == None:
+			return None
+		return map(lambda x: self.tablesFactory(x, self, schema), tables)
 
 
 class Schema(Item):
@@ -172,14 +192,37 @@ class Table(Item):
 	def schema(self):
 		return self._schema
 
+
+	def tableFieldsFactory(self):
+		return TableField
+
 	def fields(self):
+		if self._fields == None:
+			fields = self.database().connector.getTableFields(self.name, self.schema().name if self.schema() else None)
+			if fields != None:
+				self._fields = map(lambda x: self.tableFieldsFactory(x, self), fields)
 		return self._fields
 
+	def tableConstraintsFactory(self):
+		return TableConstraint
+
+	def constraints(self):
+		if self._constraints == None:
+			constraints = self.database().connector.getTableConstraints(self.name, self.schema().name if self.schema() else None)
+			if constraints != None:
+				self._constraints = map(lambda x: self.tableConstraintsFactory(x, self), constraints)
+		return self._constraints
+
+	def tableIndexesFactory(self):
+		return TableIndex
+
 	def indexes(self):
+		if self._indexes == None:
+			indexes = self.database().connector.getTableIndexes(self.name, self.schema().name if self.schema() else None)
+			if indexes != None:
+				self._indexes = map(lambda x: self.tableIndexesFactory(x, self), indexes)
 		return self._indexes
 
-	def triggers(self):
-		return self._triggers
 
 
 	def spatialInfo(self):
@@ -230,7 +273,7 @@ class Table(Item):
 	def runAction(self, action):
 		if action == "rows/count":
 			try:
-				self.rowCount = self.database().connector.getTableRowCount(self.name, self._schema.name if self._schema else None)
+				self.rowCount = self.database().connector.getTableRowCount(self.name, self.schema().name if self.schema() else None)
 				self.rowCount = int(self.rowCount) if self.rowCount != None else None
 			except:
 				self.rowCount = "Unknown"

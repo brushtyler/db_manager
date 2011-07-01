@@ -51,6 +51,9 @@ class PostGisDBPlugin(DBPlugin):
 	def connectionSettingsKey(self):
 		return '/PostgreSQL/connections'
 
+	def databasesFactory(self, connection, uri):
+		return PGDatabase(connection, uri)
+
 	def connect(self, parent=None):
 		conn_name = self.connectionName()
 		settings = QSettings()
@@ -72,16 +75,19 @@ class PostGisDBPlugin(DBPlugin):
 		settings.endGroup()
 
 		import qgis.core
-		from .connector import PostGisDBConnector
 		uri = qgis.core.QgsDataSourceURI()
 		uri.setConnection(host, port, database, username, password)
-		self.db = PGDatabase( self, PostGisDBConnector(uri) )
+		self.db = self.databasesFactory( self, uri )
 		return True
 
 
 class PGDatabase(Database):
-	def __init__(self, connection, connector):
-		Database.__init__(self, connection, connector)
+	def __init__(self, connection, uri):
+		Database.__init__(self, connection, uri)
+
+	def connectorsFactory(self, uri):
+		from .connector import PostGisDBConnector
+		return PostGisDBConnector(uri)
 
 	def generalInfo(self):
 		info = self.connector.getInfo()
@@ -126,11 +132,11 @@ class PGDatabase(Database):
 		return ret
 
 
-	def schemas(self):
-		return map(lambda x: PGSchema(x, self), self.connector.getSchemas())
+	def tablesFactory(self, row, db, schema=None):
+		return PGTable(row, db, schema)
 
-	def tables(self, schema=None):
-		return map(lambda x: PGTable(x, self, schema), self.connector.getTables(schema.name))
+	def schemasFactory(self, row, db):
+		return PGSchema(row, db)
 
 
 class PGSchema(Schema):
@@ -188,8 +194,9 @@ class PGTable(Table):
 			priv_string = u", ".join(privileges) if len(privileges) > 0 else u'<warning> This user has no privileges!'
 			ret.append( ("Privileges:", priv_string ) )
 
+			table_priv = self.database().connector.getTablePrivileges(self.name, self.schema().name if self.schema() else None)
 			if table_priv[0] and not table_priv[1] and not table_priv[2] and not table_priv[3]:
-				ret.append( (u'\n<warning> This user has read-only privileges.') )
+				ret.append( (u"\n<warning> This user has read-only privileges.") )
 
 		if not self.isView:
 			if self.rowCount != None and (self.estimatedRowCount > 2 * self.rowCount or self.estimatedRowCount * 2 < self.rowCount):
@@ -203,12 +210,12 @@ class PGTable(Table):
 		return ret
 
 	def privilegesDetails(self):
-		details = self.database().connector.getTablePrivileges(self.name, self._schema.name if self._schema else None)
+		details = self.database().connector.getTablePrivileges(self.name, self.schema().name if self.schema() else None)
 		ret = []
 		if details[0]: ret.append("select")
 		if details[1]: ret.append("insert")
-		if details[1]: ret.append("update")
-		if details[1]: ret.append("delete")
+		if details[2]: ret.append("update")
+		if details[3]: ret.append("delete")
 		return ret
 
 
@@ -216,20 +223,15 @@ class PGTable(Table):
 		pass
 
 
-	def fields(self):
-		if self._fields == None:
-			self._fields = map(lambda x: PGTableField(x, self), self.database().connector.getTableFields(self.name, self.schema().name if self.schema() else None))
-		return self._fields
+	def tableFieldsFactory(self, row, table):
+		return PGTableField(row, table)
 
-	def constraints(self):
-		if self._constraints == None:
-			self._constraints = map(lambda x: PGTableConstraint(x, self), self.database().connector.getTableConstraints(self.name, self.schema().name if self.schema() else None))
-		return self._constraints
+	def tableConstraintsFactory(self, row, table):
+		return PGTableConstraint(row, table)
 
-	def indexes(self):
-		if self._indexes == None:
-			self._indexes = map(lambda x: PGTableIndex(x, self), self.database().connector.getTableIndexes(self.name, self.schema().name if self.schema() else None))
-		return self._indexes
+	def tableIndexesFactory(self, row, table):
+		return PGTableIndex(row, table)
+
 
 
 class PGTableField(TableField):
