@@ -114,7 +114,7 @@ class SpatiaLiteDBConnector(DBConnector):
 							WHERE m.type in ('table', 'view') 
 							ORDER BY m.name, g.f_geometry_column"""
 		else:
-			sql = u"SELECT name, type, NULL, NULL, NULL, NULL FROM sqlite_master WHERE type IN ('table', 'view')"
+			sql = u"SELECT name, type = 'view', NULL, NULL, NULL, NULL FROM sqlite_master WHERE type IN ('table', 'view')"
 
 		self._exec_sql(c, sql)
 
@@ -138,7 +138,6 @@ class SpatiaLiteDBConnector(DBConnector):
 		self._exec_sql(c, sql)
 		return c.fetchall()
 
-
 	def getTableIndexes(self, table, schema=None):
 		""" get info about table's indexes """
 		c = self.connection.cursor()
@@ -159,13 +158,21 @@ class SpatiaLiteDBConnector(DBConnector):
 			indexes[i] = idx
 
 		return indexes
-	
-	
+
+	def getTableConstraints(self, table, schema=None):
+		return None
+
 	def getTableTriggers(self, table, schema=None):
 		c = self.connection.cursor()
-		sql = u"SELECT name, sql FROM sqlite_master WHERE tbl_name = %s AND type = 'trigger'" % (self.quoteString(table))
+		sql = u"SELECT name, sql FROM sqlite_master WHERE lower(tbl_name) = lower(%s) AND type = 'trigger'" % (self.quoteString(table))
 		self._exec_sql(c, sql)
 		return c.fetchall()
+
+	def deleteTableTrigger(self, trigger, table=None, schema=None):
+		""" delete trigger """
+		sql = u"DROP TRIGGER %s" % self.quoteId(trigger)
+		self._exec_sql_and_commit(sql)
+
 
 	def getTableEstimatedExtent(self, geom, table, schema=None):
 		""" find out estimated extent (from the statistics) """

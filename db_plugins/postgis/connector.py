@@ -254,11 +254,22 @@ class PostGisDBConnector(DBConnector):
 							WHERE t.relname = %s %s """ % (self.quoteString(table), schema_where)
 	
 		self._exec_sql(c, sql)
+		return c.fetchall()
 
-		triggers = []
-		for row in c.fetchall():
-			triggers.append(TableTrigger(row))
-		return triggers
+	def enableAllTableTriggers(self, enable, table, schema=None):
+		""" enable or disable all triggers on table """
+		self.enableTableTrigger(None, enable, table, schema)
+		
+	def enableTableTrigger(self, trigger, enable, table, schema=None):
+		""" enable or disable one trigger on table """
+		trigger = self.quoteId(trigger) if trigger != None else "ALL"
+		sql = u"ALTER TABLE %s %s TRIGGER %s" % (self.quoteId( (schema, table) ), "ENABLE" if enable else "DISABLE", trigger)
+		self._exec_sql_and_commit(sql)
+		
+	def deleteTableTrigger(self, trigger, table, schema=None):
+		""" delete trigger on table """
+		sql = u"DROP TRIGGER %s ON %s" % (self.quoteId(trigger), self.quoteId( (schema, table) ))
+		self._exec_sql_and_commit(sql)
 		
 	
 	def getTableRules(self, table, schema=None):
@@ -270,6 +281,11 @@ class PostGisDBConnector(DBConnector):
 	
 		self._exec_sql(c, sql)
 		return c.fetchall()
+
+	def deleteTableRule(self, rule, table, schema=None):
+		""" delete rule on table """
+		sql = u"DROP RULE %s ON %s" % (self.quoteId(rule), self.quoteId( (schema, table) ))
+		self._exec_sql_and_commit(sql)
 
 
 	def getTableEstimatedExtent(self, geom, table, schema=None):
@@ -437,6 +453,16 @@ class PostGisDBConnector(DBConnector):
 
 	def hasCustomQuerySupport(self):
 		return True
+
+	def runVacuumAnalyze(self, table, schema=None):
+		""" run vacuum analyze on a table """
+		# vacuum analyze must be run outside transaction block - we have to change isolation level
+		self.connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+		c = self.connection.cursor()
+		sql = u"VACUUM ANALYZE %s" % self.quoteId( (schema, table) )
+		self._exec_sql(c, sql)
+		self.connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
+
 
 	def fieldTypes(self):
 		return [

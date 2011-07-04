@@ -24,6 +24,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from ..db_plugins import createDbPlugin
+from .html_elems import HtmlParagraph, HtmlTable
 
 class InvalidDataException(Exception):
 	def __init__(self, msg):
@@ -66,8 +67,14 @@ class DBPlugin(QObject):
 	def connectionName(self):
 		return self.connName
 
+
 	def database(self):
 		return self.db
+
+	def info(self):
+		from .info_model import DatabaseInfo
+		return DatabaseInfo(None)
+
 
 	def connect(self):
 		return False
@@ -114,14 +121,8 @@ class Item(QObject):
 	def database(self):
 		return None
 
-	def generalInfo(self):
-		return []
-
-	def privilegesDetails(self):
-		return None
-
-	def spatialInfo(self):
-		return None
+	def info(self):
+		pass
 
 	def runAction(self):
 		pass
@@ -129,7 +130,7 @@ class Item(QObject):
 
 class Database(Item):
 	def __init__(self, dbplugin, uri):
-		QObject.__init__(self, dbplugin)
+		Item.__init__(self, dbplugin)
 		self.connector = self.connectorsFactory( uri )
 
 	def connectorsFactory(self, uri):
@@ -140,9 +141,6 @@ class Database(Item):
 
 	def database(self):
 		return self
-
-	def connectionDetails(self):
-		return []
 
 
 	def schemasFactory(self, row, db):
@@ -164,6 +162,11 @@ class Database(Item):
 		return map(lambda x: self.tablesFactory(x, self, schema), tables)
 
 
+	def info(self):
+		from .info_model import DatabaseInfo
+		return DatabaseInfo(self)
+
+
 class Schema(Item):
 	def __init__(self, db):
 		Item.__init__(self, db)
@@ -177,6 +180,11 @@ class Schema(Item):
 		return self.parent().tables(self)
 
 
+	def info(self):
+		from .info_model import SchemaInfo
+		return SchemaInfo(self)
+
+
 class Table(Item):
 	def __init__(self, db, schema=None, parent=None):
 		Item.__init__(self, db)
@@ -184,7 +192,11 @@ class Table(Item):
 		self.name = self.isView = self.owner = self.pages = self.geomCol = self.geomType = self.geomDim = self.srid = None
 		self.rowCount = None
 
-		self._fields = self._indexes = self._triggers = None
+		self._fields = self._indexes = self._constraints = self._triggers = self._rules = None
+
+	def __del__(self):
+		print "Table.__del__", self
+		self._fields = self._indexes = self._constraints = self._triggers = self._rules = None
 
 	def database(self):
 		return self.parent()
@@ -192,103 +204,133 @@ class Table(Item):
 	def schema(self):
 		return self._schema
 
+	def schemaName(self):
+		return self.schema().name if self.schema() else None
+
+	def info(self):
+		from .info_model import TableInfo
+		return TableInfo(self)
+
 
 	def tableFieldsFactory(self):
-		return TableField
+		return None
 
 	def fields(self):
 		if self._fields == None:
-			fields = self.database().connector.getTableFields(self.name, self.schema().name if self.schema() else None)
+			fields = self.database().connector.getTableFields(self.name, self.schemaName())
 			if fields != None:
 				self._fields = map(lambda x: self.tableFieldsFactory(x, self), fields)
 		return self._fields
 
+
 	def tableConstraintsFactory(self):
-		return TableConstraint
+		return None
 
 	def constraints(self):
 		if self._constraints == None:
-			constraints = self.database().connector.getTableConstraints(self.name, self.schema().name if self.schema() else None)
+			constraints = self.database().connector.getTableConstraints(self.name, self.schemaName())
 			if constraints != None:
 				self._constraints = map(lambda x: self.tableConstraintsFactory(x, self), constraints)
 		return self._constraints
 
+
 	def tableIndexesFactory(self):
-		return TableIndex
+		return None
 
 	def indexes(self):
 		if self._indexes == None:
-			indexes = self.database().connector.getTableIndexes(self.name, self.schema().name if self.schema() else None)
+			indexes = self.database().connector.getTableIndexes(self.name, self.schemaName())
 			if indexes != None:
 				self._indexes = map(lambda x: self.tableIndexesFactory(x, self), indexes)
 		return self._indexes
 
 
+	def tableTriggersFactory(self, row, table):
+		return None
 
-	def spatialInfo(self):
-		if self.geomType == None:
-			return []
+	def triggers(self):
+		if self._triggers == None:
+			triggers = self.database().connector.getTableTriggers(self.name, self.schemaName())
+			if triggers != None:
+				self._triggers = map(lambda x: self.tableTriggersFactory(x, self), triggers)
+		return self._triggers
 
-		ret = [
-			("Column:", self.geomColumn),
-			("Geometry:", self.geomType)
-		]
 
-		# only if we have info from geometry_columns
-		if self.geomDim:
-			ret.append( ("Dimension:", self.geomDim) )
-			sr_info = self.database().connector.getSpatialRefInfo(self.srid) if self.srid != -1 else "Undefined"
-			if sr_info: ret.append( ("Spatial ref:", "%s (%d)" % (sr_info, self.srid)) )
+	def tableRulesFactory(self, row, table):
+		return None
 
-		# estimated extent
-		if not self.isView:
-			extent = self.database().connector.getTableEstimatedExtent(self.geomColumn, self.name, self.schema().name if self.schema() else None)
-			if extent != None and extent[0] != None:
-				extent = '%.5f, %.5f - %.5f, %.5f' % extent
-			else:
-				extent = '(unknown)'
-			ret.append( ("Extent:", extent) )
-
-		# is there an entry in geometry_columns?
-		if self.geomType.lower() == 'geometry':
-			ret.append( u"\n<warning>There isn't entry in geometry_columns!" )
-
-		# find out whether the geometry column has spatial index on it
-		if not self.isView:
-			has_spatial_index = False
-			for fld in self.fields():
-				if fld.name == self.geomColumn:
-					for idx in self.indexes():
-						if fld.num in idx.columns:
-							has_spatial_index = True
-							break
-					break
-
-			if not has_spatial_index:
-				ret.append( u'\n<warning>No spatial index defined.' )
-
-		return ret
+	def rules(self):
+		if self._rules == None:
+			rules = self.database().connector.getTableRules(self.name, self.schemaName())
+			if rules != None:
+				self._rules = map(lambda x: self.tableRulesFactory(x, self), rules)
+		return self._rules
 
 
 	def runAction(self, action):
-		if action == "rows/count":
-			try:
-				self.rowCount = self.database().connector.getTableRowCount(self.name, self.schema().name if self.schema() else None)
-				self.rowCount = int(self.rowCount) if self.rowCount != None else None
-			except:
-				self.rowCount = "Unknown"
+		action = unicode(action)
+
+		if action.startswith( "rows/" ):
+			if action == "rows/count":
+				try:
+					self.rowCount = self.database().connector.getTableRowCount(self.name, self.schemaName())
+					self.rowCount = int(self.rowCount) if self.rowCount != None else None
+				except DbError:
+					self.rowCount = "Unknown"
+				return True
+
+		elif action.startswith( "triggers/" ):
+			parts = action.split('/')
+			trigger_action = parts[1]
+
+			msg = u"Do you want to %s all triggers?" % trigger_action
+			if QMessageBox.question(None, "Table triggers", msg, QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
+				return False
+
+			if trigger_action == "enable" or trigger_action == "disable":
+				enable = trigger_action == "enable"
+				try:
+					self.database().connector.enableAllTableTriggers(enable, self.name, self.schemaName())
+				except DbError:
+					raise
+				return True
+
+		elif action.startswith( "trigger/" ):
+			parts = action.split('/')
+			trigger_name = parts[1]
+			trigger_action = parts[2]
+
+			msg = u"Do you want to %s trigger %s?" % (trigger_action, trigger_name)
+			if QMessageBox.question(None, "Table trigger", msg, QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
+				return False
+
+			if trigger_action == "delete":
+				try:
+					self.database().connector.deleteTableTrigger(trigger_name, self.name, self.schemaName())
+				except DbError:
+					raise
+				return True
+
+			elif trigger_action == "enable" or trigger_action == "disable":
+				enable = trigger_action == "enable"
+				try:
+					self.database().connector.enableTableTrigger(trigger_name, enable, self.name, self.schemaName())
+				except DbError:
+					raise
+				return True
+
+		return False
 
 
-class TableSubItem:
+class TableSubItem(QObject):
 	def __init__(self, table):
-		self._table = table
+		QObject.__init__(self, table)
 
 	def __del__(self):
 		print "TableSubItem.__del__", self
-		self._table = None
 
 	def table(self):
-		return self._table
+		return self.parent()
 
 
 class TableField(TableSubItem):
@@ -296,14 +338,23 @@ class TableField(TableSubItem):
 		TableSubItem.__init__(self, table)
 		self.num = self.name = self.dataType = self.modifier = self.notNull = self.default = self.hasDefault = self.primaryKey = None
 
+	def type2String(self):
+		if self.modifier == None or self.modifier == -1:
+			return u"%s" % self.dataType
+		return u"%s (%s)" % (self.dataType, self.modifier)
+
+	def default2String(self):
+		if not self.hasDefault:
+			return ''
+		return self.default if self.default != None else "NULL"
+
 	def definition(self):
-		name = self._table.database().quoteId(self.name)
-		data_type = u"%s(%s)" % (self.dataType, self.modifier) if self.modifier is not None else u"%s" % self.dataType
+		name = self.table().database().quoteId(self.name)
 		not_null = "NOT NULL" if self.notNull else ""
 
-		txt = u"%s %s %s" % (name, data_type, not_null)
+		txt = u"%s %s %s" % (name, self.type2String(), not_null)
 		if self.hasDefault:
-			txt += u" DEFAULT %s" % (self.default if self.default is not None else "NULL")
+			txt += u" DEFAULT %s" % self.default2String()
 		return txt
 
 
@@ -318,8 +369,14 @@ class TableConstraint(TableSubItem):
 
 	def __init__(self, table):
 		TableSubItem.__init__(self, table)
-		self._table = table
 		self.name = self.type = self.columns = None
+
+	def type2String(self):
+		if self.type == TableConstraint.TypeCheck: return "Check"
+		if self.type == TableConstraint.TypePrimaryKey: return "Primary key"
+		if self.type == TableConstraint.TypeForeignKey: return "Foreign key"
+		if self.type == TableConstraint.TypeUnique: return "Unique"
+		return 'Unknown'
 
 
 class TableIndex(TableSubItem):
@@ -327,3 +384,36 @@ class TableIndex(TableSubItem):
 		TableSubItem.__init__(self, table)
 		self.name = self.columns = self.isUnique = None
 
+class TableTrigger(TableSubItem):
+	""" class that represents a trigger """
+	
+	# Bits within tgtype (pg_trigger.h)
+	TypeRow      = (1 << 0) # row or statement
+	TypeBefore   = (1 << 1) # before or after
+	# events: one or more
+	TypeInsert   = (1 << 2)
+	TypeDelete   = (1 << 3)
+	TypeUpdate   = (1 << 4)
+	TypeTruncate = (1 << 5)
+
+	def __init__(self, table):
+		TableSubItem.__init__(self, table)
+		self.name = self.function = None
+
+	def type2String(self):
+		trig_type = u''
+		trig_type += "Before " if self.type & TableTrigger.TypeBefore else "After "
+		if self.type & TableTrigger.TypeInsert: trig_type += "INSERT "
+		if self.type & TableTrigger.TypeUpdate: trig_type += "UPDATE "
+		if self.type & TableTrigger.TypeDelete: trig_type += "DELETE "
+		if self.type & TableTrigger.TypeTruncate: trig_type += "TRUNCATE "
+		trig_type += "\n"
+		trig_type += "for each "
+		trig_type += "row" if self.type & TableTrigger.TypeRow else "statement"
+		return trig_type
+
+class TableRule(TableSubItem):
+	def __init__(self, table):
+		TableSubItem.__init__(self, table)
+		self.name = self.definition = None
+ 

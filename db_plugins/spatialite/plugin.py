@@ -23,11 +23,13 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..plugin import DBPlugin, Database, Table, TableField, TableConstraint, TableIndex
+from ..plugin import DBPlugin, Database, Table, TableField, TableConstraint, TableIndex, TableTrigger
 try:
 	from . import resources_rc
 except ImportError:
 	pass
+
+from ..html_elems import HtmlParagraph, HtmlTable
 
 
 def classFactory():
@@ -79,31 +81,6 @@ class SLDatabase(Database):
 		from .connector import SpatiaLiteDBConnector
 		return SpatiaLiteDBConnector(uri)
 
-	def connectionDetails(self):
-		return [ 
-			("Filename:", self.connector.dbname) 
-		]
-
-	def spatialInfo(self):
-		info = self.connector.getSpatialInfo()
-		ret = [
-			("Library:", info[0]), 
-			("GEOS:", info[1]), 
-			("Proj:", info[2]) 
-		]
-
-		if not self.connector.has_geometry_columns:
-			ret.append( u"\n<warning> geometry_columns table doesn't exist! " \
-				"This table is essential for many GIS applications for enumeration of tables." )
-
-		return ret
-
-	def generalInfo(self):
-		info = self.connector.getInfo()
-		return [
-			("SQLite version", info[0])
-		]
-
 
 	def schemasFactory(self, row, db):
 		return None
@@ -112,33 +89,25 @@ class SLDatabase(Database):
 		return SLTable(row, db, schema)
 
 
+	def info(self):
+		from .info_model import SLDatabaseInfo
+		return SLDatabaseInfo(self)
+
+
 class SLTable(Table):
 	def __init__(self, row, db, schema=None):
 		Table.__init__(self, db, None)
 		self.name, self.isView, self.geomColumn, self.geomType, self.geomDim, self.srid, self.isSysTable = row
 
-	def generalInfo(self):
-		if self.rowCount == None:
-			self.runAction("rows/count")
-
-		return [
-			("Relation type:", "View" if self.isView else "Table"), 
-			("Rows:", self.rowCount) 
-		]
-
-
-	def fieldsDetails(self):
-		pass	# not implemented yet
-
 
 	def tableFieldsFactory(self, row, table):
 		return SLTableField(row, table)
 
-	def tableConstraintsFactory(self, row, table):
-		return None
-
 	def tableIndexesFactory(self, row, table):
 		return SLTableIndex(row, table)
+
+	def tableTriggersFactory(self, row, table):
+		return SLTableTrigger(row, table)
 
 
 class SLTableField(TableField):
@@ -147,9 +116,13 @@ class SLTableField(TableField):
 		self.num, self.name, self.dataType, self.notNull, self.default, self.primaryKey = row
 		self.hasDefault = self.default != None
 
-
 class SLTableIndex(TableIndex):
 	def __init__(self, row, table):
 		TableIndex.__init__(self, table)
 		self.num, self.name, self.isUnique, self.columns = row
+
+class SLTableTrigger(TableTrigger):
+	def __init__(self, row, table):
+		TableTrigger.__init__(self, table)
+		self.name, self.function = row
 

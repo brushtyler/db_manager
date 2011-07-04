@@ -23,11 +23,13 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..plugin import DBPlugin, Database, Schema, Table, TableField, TableConstraint, TableIndex
+from ..plugin import DBPlugin, Database, Schema, Table, TableField, TableConstraint, TableIndex, TableTrigger, TableRule
 try:
 	from . import resources_rc
 except ImportError:
 	pass
+
+from ..html_elems import HtmlParagraph, HtmlList, HtmlTable
 
 
 def classFactory():
@@ -89,48 +91,6 @@ class PGDatabase(Database):
 		from .connector import PostGisDBConnector
 		return PostGisDBConnector(uri)
 
-	def generalInfo(self):
-		info = self.connector.getInfo()
-		return [
-			("Server version: ", info[0])
-		]
-
-	def connectionDetails(self):
-		return [ 
-			("Host:", self.connector.host), 
-			("User:", self.connector.user)
-		]
-
-	def spatialInfo(self):
-		info = self.connector.getSpatialInfo()
-		ret = [
-			("Library:", info[0]), 
-			("Scripts:", info[1]),
-			("GEOS:", info[3]), 
-			("Proj:", info[4]), 
-			("Use stats:", info[5]) 
-		]
-
-		if info[1] != None and info[1] != info[2]:
-			ret.append( u"\n<warning> Version of installed scripts doesn't match version of released scripts!\n" \
-				"This is probably a result of incorrect PostGIS upgrade." )
-
-		if not self.connector.has_geometry_columns:
-			ret.append( u"\n<warning> geometry_columns table doesn't exist!\n" \
-				"This table is essential for many GIS applications for enumeration of tables." )
-		elif not self.connector.has_geometry_columns_access:
-			ret.append( u"\n<warning> This user doesn't have privileges to read contents of geometry_columns table!\n" \
-				"This table is essential for many GIS applications for enumeration of tables." )
-
-		return ret
-
-	def privilegesDetails(self):
-		details = self.connector.getDatabasePrivileges()
-		ret = []
-		if details[0]: ret.append("create new schemas") 
-		if details[1]: ret.append("create temporary tables") 
-		return ret
-
 
 	def tablesFactory(self, row, db, schema=None):
 		return PGTable(row, db, schema)
@@ -145,83 +105,46 @@ class PGSchema(Schema):
 		self.oid, self.name, self.owner, self.perms = row
 		self.tableCount = len(self.tables())
 
-	def generalInfo(self):
-		info = [
-			("Tables:", self.tableCount)
-		]
-		if self.owner: info.append( ("Owner", self.owner) )
-		return info
-
-	def privilegesDetails(self):
-		details = self.database().connector.getSchemaPrivileges(self.name)
-		ret = []
-		if details[0]: ret.append("create new objects")
-		if details[1]: ret.append("access objects")
-		return ret
 
 class PGTable(Table):
 	def __init__(self, row, db, schema=None):
 		Table.__init__(self, db, schema)
 		self.name, schema_name, self.isView, self.owner, self.estimatedRowCount, self.pages, self.geomColumn, self.geomType, self.geomDim, self.srid = row
 		self.estimatedRowCount = int(self.estimatedRowCount)
-		self._constraints = self._rules = None
-
-	def generalInfo(self):
-		# if the estimation is less than 100 rows, try to count them - it shouldn't take long time
-		if self.rowCount == None and self.estimatedRowCount < 100:
-			self.runAction("rows/count")
-
-		ret = [
-			("Relation type:", "View" if self.isView else "Table"), 
-			("Owner:", self.owner), 
-			("Pages:", self.pages), 
-			("Rows (estimation):", self.estimatedRowCount )
-		]
-
-		if self.rowCount == None or (isinstance(self.rowCount, int) and self.rowCount >= 0):
-			ret.append( ("Rows (counted):", self.rowCount if self.rowCount != None else 'Unknown (<a href="action:rows/count">find out</a>)') )
-
-		# privileges
-		# has the user access to this schema?
-		schema_priv = self._schema.privilegesDetails() if self._schema else None
-		if schema_priv == None:
-			pass
-		elif len(schema_priv) <= 0:
-			priv_string = u"<warning> This user doesn't have usage privileges for this schema!"
-			ret.append( ("Privileges:", priv_string ) )
-		else:
-			privileges = self.privilegesDetails()
-			priv_string = u", ".join(privileges) if len(privileges) > 0 else u'<warning> This user has no privileges!'
-			ret.append( ("Privileges:", priv_string ) )
-
-			table_priv = self.database().connector.getTablePrivileges(self.name, self.schema().name if self.schema() else None)
-			if table_priv[0] and not table_priv[1] and not table_priv[2] and not table_priv[3]:
-				ret.append( (u"\n<warning> This user has read-only privileges.") )
-
-		if not self.isView:
-			if self.rowCount != None and (self.estimatedRowCount > 2 * self.rowCount or self.estimatedRowCount * 2 < self.rowCount):
-				ret.append( (u"\n<warning> There's a significant difference between estimated and real row count. \n" \
-					"Consider running VACUUM ANALYZE.") )
-
-		if not self.isView:
-			if len( filter(lambda fld: fld.primaryKey, self.fields()) ) <= 0:
-				ret.append( (u"\n<warning> No primary key defined for this table!") )
-
-		return ret
-
-	def privilegesDetails(self):
-		details = self.database().connector.getTablePrivileges(self.name, self.schema().name if self.schema() else None)
-		ret = []
-		if details[0]: ret.append("select")
-		if details[1]: ret.append("insert")
-		if details[2]: ret.append("update")
-		if details[3]: ret.append("delete")
-		return ret
 
 
-	def fieldsDetails(self):
-		pass
+	def runVacuumAnalyze(self):
+		self.database().connector.runVacuumAnalyze(self.name, self.schemaName())
 
+
+	def runAction(self, action):
+		action = unicode(action)
+
+		if action.startswith( "table/" ):
+			if action == "table/vacuum":
+				try:
+					self.runVacuumAnalyze()
+				except DbError:
+					raise
+				return True
+
+		elif action.startswith( "rule/" ):
+			parts = action.split('/')
+			rule_name = parts[1]
+			rule_action = parts[2]
+
+			msg = u"Do you want to %s rule %s?" % (rule_action, rule_name)
+			if QMessageBox.question(None, "Table rule", msg, QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
+				return False
+
+			if rule_action == "delete":
+				try:
+					self.database().connector.deleteTableRule(rule_name, self.name, self.schemaName())
+				except DbError:
+					raise
+				return True
+
+		return Table.runAction(self, action)
 
 	def tableFieldsFactory(self, row, table):
 		return PGTableField(row, table)
@@ -232,6 +155,16 @@ class PGTable(Table):
 	def tableIndexesFactory(self, row, table):
 		return PGTableIndex(row, table)
 
+	def tableTriggersFactory(self, row, table):
+		return PGTableTrigger(row, table)
+
+	def tableRulesFactory(self, row, table):
+		return PGTableRule(row, table)
+
+
+	def info(self):
+		from .info_model import PGTableInfo
+		return PGTableInfo(self)
 
 
 class PGTableField(TableField):
@@ -241,8 +174,8 @@ class PGTableField(TableField):
 		self.primaryKey = False
 
 		# find out whether fields are part of primary key
-		for con in self._table.constraints():
-			if con.type == PGTableConstraint.TypePrimaryKey and self.num in con.columns:
+		for con in self.table().constraints():
+			if con.type == TableConstraint.TypePrimaryKey and self.num in con.columns:
 				self.primaryKey = True
 				break
 
@@ -263,9 +196,22 @@ class PGTableConstraint(TableConstraint):
 			self.foreignMatchType = TableConstraint.matchTypes[row[9]]
 			self.foreignKeys = row[10]
 
+
 class PGTableIndex(TableIndex):
 	def __init__(self, row, table):
 		TableIndex.__init__(self, table)
 		self.name, columns, self.isUnique = row
 		self.columns = map(int, columns.split(' '))
+
+
+class PGTableTrigger(TableTrigger):
+	def __init__(self, row, table):
+		TableTrigger.__init__(self, table)
+		self.name, self.function, self.type, self.enabled = row
+
+class PGTableRules(TableRule):
+	def __init__(self, row, table):
+		TableSubItem.__init__(self, table)
+		self.name, self.definition = row
+
 
