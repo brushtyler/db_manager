@@ -209,7 +209,7 @@ class PGTableTrigger(TableTrigger):
 		TableTrigger.__init__(self, table)
 		self.name, self.function, self.type, self.enabled = row
 
-class PGTableRules(TableRule):
+class PGTableRule(TableRule):
 	def __init__(self, row, table):
 		TableSubItem.__init__(self, table)
 		self.name, self.definition = row

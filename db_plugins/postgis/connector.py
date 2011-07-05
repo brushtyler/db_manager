@@ -350,7 +350,7 @@ class PostGisDBConnector(DBConnector):
 	def deleteTable(self, table, schema=None):
 		""" delete table and its reference in geometry_columns """
 		if self.has_spatial and self.has_geometry_columns and self.has_geometry_columns_access:
-			schema_part = u"'%s', " % self.quoteString(schema) if schema is not None else ""
+			schema_part = u"%s, " % self.quoteString(schema) if schema is not None else ""
 			sql = u"SELECT DropGeometryTable(%s%s)" % (schema_part, self.quoteString(table))
 		else:
 			sql = u"DROP TABLE %s" % self.quoteId( (schema, table) )

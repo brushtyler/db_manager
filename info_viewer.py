@@ -35,10 +35,6 @@ class InfoViewer(QTextBrowser):
 		self.connect(self, SIGNAL("anchorClicked(const QUrl&)"), self._linkClicked)
 		self.__clear()
 
-	def __del__(self):
-		print "InfoViewer.__del__"
-		self.item = None
-
 	def _linkClicked(self, url):
 		if self.item == None:
 			return

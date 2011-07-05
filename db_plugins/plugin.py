@@ -114,12 +114,15 @@ class DBPlugin(QObject):
 		return None
 
 
-class Item(QObject):
+class DbItemObject(QObject):
 	def __init__(self, parent=None):
 		QObject.__init__(self, parent)
 
 	def database(self):
 		return None
+
+	def refresh(self):
+		pass	# refresh the item data reading them from the db
 
 	def info(self):
 		pass
@@ -127,10 +130,13 @@ class Item(QObject):
 	def runAction(self):
 		pass
 
+	def registerActions(self, mainWindow):
+		pass
 
-class Database(Item):
+
+class Database(DbItemObject):
 	def __init__(self, dbplugin, uri):
-		Item.__init__(self, dbplugin)
+		DbItemObject.__init__(self, dbplugin)
 		self.connector = self.connectorsFactory( uri )
 
 	def connectorsFactory(self, uri):
@@ -142,6 +148,19 @@ class Database(Item):
 	def database(self):
 		return self
 
+	def info(self):
+		from .info_model import DatabaseInfo
+		return DatabaseInfo(self)
+
+
+	def registerAllActions(self, mainWindow):
+		if self.schemas() != None:
+			action = QAction("&Delete (empty) schema", self)
+			mainWindow.registerAction( action, "&Schema", self.deleteSchema )
+		action = QAction(QIcon(":/db_manager/del_table"), "&Delete table/view", self)
+		mainWindow.registerAction( action, "&Table", self.deleteTable )
+		action = QAction("&Empty table", self)
+		mainWindow.registerAction( action, "&Table", self.emptyTable )
 
 	def schemasFactory(self, row, db):
 		return None
@@ -152,6 +171,17 @@ class Database(Item):
 			return None
 		return map(lambda x: self.schemasFactory(x, self), schemas)
 
+	def deleteSchema(self, item, action, parent):
+		if not isinstance(item, Schema):
+			QMessageBox.information(parent, "Sorry", "Select an empty SCHEMA for deletion.")
+			return
+		res = QMessageBox.question(parent, "hey!", u"Really delete schema %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
+		if res != QMessageBox.Yes:
+			return
+		self.connector.deleteSchema(item.name)
+		self.emit( SIGNAL('contentRemoved'), item )
+
+
 	def tablesFactory(self, row, db, schema=None):
 		return None
 
@@ -161,15 +191,32 @@ class Database(Item):
 			return None
 		return map(lambda x: self.tablesFactory(x, self, schema), tables)
 
+	def deleteTable(self, item, action, parent):
+		if not isinstance(item, Table):
+			QMessageBox.information(parent, "Sorry", "Select a TABLE for deletion.")
+			return
+		res = QMessageBox.question(parent, "hey!", u"Really delete table/view %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
+		if res != QMessageBox.Yes:
+			return
+		self.connector.deleteTable(item.name, item.schemaName())
+		self.emit( SIGNAL('contentRemoved'), item )
 
-	def info(self):
-		from .info_model import DatabaseInfo
-		return DatabaseInfo(self)
+	def emptyTable(self, item, action, parent):
+		if not isinstance(item, Table):
+			QMessageBox.information(parent, "Sorry", "Select a TABLE to empty it.")
+			return False
+		res = QMessageBox.question(parent, "hey!", u"Really delete all items from table %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
+		if res != QMessageBox.Yes:
+			return False
+		self.connector.emptyTable(item.name, item.schemaName())
+		item.refresh()	#TODO refresh the item data
+		self.emit( SIGNAL('contentChanged'), item )
+		return True
 
 
-class Schema(Item):
+class Schema(DbItemObject):
 	def __init__(self, db):
-		Item.__init__(self, db)
+		DbItemObject.__init__(self, db)
 		self.oid = self.name = self.owner = self.perms = None
 		self.tableCount = 0
 
@@ -185,9 +232,9 @@ class Schema(Item):
 		return SchemaInfo(self)
 
 
-class Table(Item):
+class Table(DbItemObject):
 	def __init__(self, db, schema=None, parent=None):
-		Item.__init__(self, db)
+		DbItemObject.__init__(self, db)
 		self._schema = schema
 		self.name = self.isView = self.owner = self.pages = self.geomCol = self.geomType = self.geomDim = self.srid = None
 		self.rowCount = None
@@ -196,7 +243,6 @@ class Table(Item):
 
 	def __del__(self):
 		print "Table.__del__", self
-		self._fields = self._indexes = self._constraints = self._triggers = self._rules = None
 
 	def database(self):
 		return self.parent()
@@ -322,20 +368,17 @@ class Table(Item):
 		return False
 
 
-class TableSubItem(QObject):
+class TableSubItemObject(QObject):
 	def __init__(self, table):
 		QObject.__init__(self, table)
-
-	def __del__(self):
-		print "TableSubItem.__del__", self
 
 	def table(self):
 		return self.parent()
 
 
-class TableField(TableSubItem):
+class TableField(TableSubItemObject):
 	def __init__(self, table):
-		TableSubItem.__init__(self, table)
+		TableSubItemObject.__init__(self, table)
 		self.num = self.name = self.dataType = self.modifier = self.notNull = self.default = self.hasDefault = self.primaryKey = None
 
 	def type2String(self):
@@ -358,7 +401,7 @@ class TableField(TableSubItem):
 		return txt
 
 
-class TableConstraint(TableSubItem):
+class TableConstraint(TableSubItemObject):
 	""" class that represents a constraint of a table (relation) """
 	
 	TypeCheck, TypeForeignKey, TypePrimaryKey, TypeUnique = range(4)
@@ -368,7 +411,7 @@ class TableConstraint(TableSubItem):
 	matchTypes = { "u" : "UNSPECIFIED", "f" : "FULL", "p" : "PARTIAL" }
 
 	def __init__(self, table):
-		TableSubItem.__init__(self, table)
+		TableSubItemObject.__init__(self, table)
 		self.name = self.type = self.columns = None
 
 	def type2String(self):
@@ -379,12 +422,12 @@ class TableConstraint(TableSubItem):
 		return 'Unknown'
 
 
-class TableIndex(TableSubItem):
+class TableIndex(TableSubItemObject):
 	def __init__(self, table):
-		TableSubItem.__init__(self, table)
+		TableSubItemObject.__init__(self, table)
 		self.name = self.columns = self.isUnique = None
 
-class TableTrigger(TableSubItem):
+class TableTrigger(TableSubItemObject):
 	""" class that represents a trigger """
 	
 	# Bits within tgtype (pg_trigger.h)
@@ -397,7 +440,7 @@ class TableTrigger(TableSubItem):
 	TypeTruncate = (1 << 5)
 
 	def __init__(self, table):
-		TableSubItem.__init__(self, table)
+		TableSubItemObject.__init__(self, table)
 		self.name = self.function = None
 
 	def type2String(self):
@@ -412,8 +455,8 @@ class TableTrigger(TableSubItem):
 		trig_type += "row" if self.type & TableTrigger.TypeRow else "statement"
 		return trig_type
 
-class TableRule(TableSubItem):
+class TableRule(TableSubItemObject):
 	def __init__(self, table):
-		TableSubItem.__init__(self, table)
+		TableSubItemObject.__init__(self, table)
 		self.name = self.definition = None
  

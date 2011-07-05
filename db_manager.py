@@ -45,6 +45,8 @@ class DBManager(QMainWindow):
 		self.itemChanged(None)
 
 	def closeEvent(self, e):
+		self.unregisterAllActions()
+
 		# save the window state
 		settings = QSettings()
 		settings.setValue( "/DB_Manager/windowState", QVariant(self.saveState()) )
@@ -53,8 +55,39 @@ class DBManager(QMainWindow):
 		QMainWindow.closeEvent(self, e)
 
 
+	def refreshItem(self, item=None):
+		self.tree.refreshItem(item)
+		self.info.refresh()
+
+	def removeItem(self, item=None):
+		self.tree.refreshItem(item, True)
+
+
 	def itemChanged(self, item):
+		self.reloadButtons()
 		self.refreshTabs( item )
+
+
+	def reloadButtons(self):
+		db = self.tree.currentDatabase()
+		if not hasattr(self, '_lastDb'):
+			self._lastDb = db
+		elif db == self._lastDb:
+			return
+
+		# remove old actions
+		if self._lastDb != None:
+			self.unregisterAllActions()
+			self.disconnect( self._lastDb, SIGNAL("contentChanged"), self.refreshItem )
+			self.disconnect( self._lastDb, SIGNAL("contentRemoved"), self.removeItem )
+
+		# add actions of the selected database
+		self._lastDb = db
+		if self._lastDb != None:
+			self._lastDb.registerAllActions(self)
+			self.connect( self._lastDb, SIGNAL("contentChanged"), self.refreshItem )
+			self.connect( self._lastDb, SIGNAL("contentRemoved"), self.removeItem )
+
 
 	def refreshTabs(self, item):
 		# enable/disable tabs
@@ -80,40 +113,80 @@ class DBManager(QMainWindow):
 	def showSqlWindow(self):
 		db = self.tree.currentDatabase()
 		if db == None:
-			QMessageBox.information(self, u"Sorry", u"No database selected or you are not connected.")
+			QMessageBox.information(self, "Sorry", "No database selected or you are not connected.")
 			return
 
 		from dlg_sql_window import DlgSqlWindow
 		dlg = DlgSqlWindow(self, db)
 		dlg.exec_()
-		self.emit( SIGNAL('reloadDatabase'), db)
+		self.refreshItem( db.connection() )
 
-	def refreshDatabase(self):
-		pass
+	def deleteSchema(self):
+		item = self.tree.currentSchema()
+		if item == None:
+			QMessageBox.information(self, "Sorry", "Select a SCHEMA for deletion.")
+			return
+		res = QMessageBox.question(self, "hey!", u"Really delete schema %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
+		if res != QMessageBox.Yes:
+			return
+		item.delete()
+
+	def deleteTable(self):
+		item = self.tree.currentTable()
+		if item == None:
+			QMessageBox.information(self, "Sorry", "Select a TABLE or VIEW for deletion.")
+			return
+		res = QMessageBox.question(self, "hey!", u"Really delete table/view %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
+		if res != QMessageBox.Yes:
+			return
+		item.delete()
+
 
 
 	def registerAction(self, action, menu, callback):
 		""" register an action to the manager's main menu """
-		invoke_callback = lambda x: self.__invokeCallback( callback, checked )
-		for a in self.menuBar().actions():
-			if not a.menu() or a.menu().text() != menu:
+		if not hasattr(self, '_registeredDbActions'):
+			self._registeredDbActions = []
+
+		invoke_callback = lambda x: self.__invokeCallback( callback )
+		for a in self.menuBar.actions():
+			if not a.menu() or a.menu().title() != menu:
 				continue
 			a.menu().addAction( action )
+			self._registeredDbActions.append( (action, menu) )
+			a.setVisible(True)	# show the menu
 			QObject.connect( action, SIGNAL("triggered(bool)"), invoke_callback )
 			return True
 		return False
 
-	def __invokeCallback(self, callback, checked):
+	def __invokeCallback(self, callback):
 		action = self.sender
-		return callback( self.dbPlugin, checked, self.__currentDBTreeItem() ) 
+		selected_item = self.tree.currentItem()
+		return callback( selected_item, action, self ) 
 
 	def unregisterAction(self, action, menu):
-		for a in self.menuBar().actions():
-			if not a.menu() or a.menu().text() != menu:
+		if not hasattr(self, '_registeredDbActions'):
+			return
+
+		for a in self.menuBar.actions():
+			if not a.menu() or a.menu().title() != menu:
 				continue
 			a.menu().removeAction( action )
+			if self._registeredDbActions.count( (action, menu) ) > 0:
+				self._registeredDbActions.remove( (action, menu) )
+			action.deleteLater()
+			if a.menu().isEmpty():	# hide the menu
+				a.setVisible(False)
 			return True
 		return False
+
+	def unregisterAllActions(self):
+		if not hasattr(self, '_registeredDbActions'):
+			return
+
+		for action, menu in list(self._registeredDbActions):
+			self.unregisterAction( action, menu )
+		self._registeredDbActions = []
 
 
 	def setupUi(self):
@@ -147,8 +220,13 @@ class DBManager(QMainWindow):
 		self.menuBar = QMenuBar(self)
 		self.menuDb = QMenu("&Database", self)
 		self.menuBar.addMenu(self.menuDb)
+		self.menuSchema = QMenu("&Schema", self)
+		self.menuBar.addMenu(self.menuSchema).setVisible(False)
+		self.menuTable = QMenu("&Table", self)
+		self.menuBar.addMenu(self.menuTable).setVisible(False)
 		self.menuHelp = QMenu("&Help", self)
 		self.menuBar.addMenu(self.menuHelp)
+
 		self.setMenuBar(self.menuBar)
 
 		# create toolbar
@@ -158,9 +236,15 @@ class DBManager(QMainWindow):
 		self.addToolBar(self.toolBar)
 
 		# create menus' actions
-		self.actionRefresh = self.menuDb.addAction( QIcon(":/db_manager/refresh"), "&Refresh", self.refreshDatabase, QKeySequence("F5") )
+		# menuDb
+		self.actionRefresh = self.menuDb.addAction( QIcon(":/db_manager/refresh"), "&Refresh", self.refreshItem, QKeySequence("F5") )
 		self.actionSqlWindow = self.menuDb.addAction( QIcon(":/db_manager/sql_window"), "&SQL window", self.showSqlWindow, QKeySequence("F2") )
-		self.actionClose = self.menuDb.addAction( QIcon(), u"Exit", self.close, QKeySequence("CTRL+Q") )
+		self.actionClose = self.menuDb.addAction( QIcon(), "&Exit", self.close, QKeySequence("CTRL+Q") )
+		# menuTable
+		#self.actionEmptyTable = self.menuTable.addAction("E&mpty table", self.emptyTable)
+		#self.actionDeleteTable = self.menuTable.addAction(QIcon(":/db_manager/del_table"),"&Delete table/view", self.deleteTable)
+		# menuHelp
+		#self.actionAbout = self.menuHelp.addAction("&About", self.about)
 
 		# add actions to the toolbar
 		self.toolBar.addAction( self.actionRefresh )

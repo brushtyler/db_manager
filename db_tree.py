@@ -36,11 +36,19 @@ class DBTree(QTreeView):
 		self.connect(self, SIGNAL("collapsed(const QModelIndex&)"), self.itemChanged)
 		self.connect(self.model(), SIGNAL("dataChanged(const QModelIndex&, const QModelIndex&)"), self.itemChanged)
 
+
+	def refreshItem(self, item=None, removed=False):
+		if item == None:
+			item = self.currentItem()
+			if item == None: return
+		self.model().refreshItem(item, removed)
+
 	def currentItem(self):
 		indexes = self.selectedIndexes()
 		if len(indexes) <= 0:
 			return
 		return self.model().getItem(indexes[0])
+
 
 	def currentDatabase(self):
 		item = self.currentItem()
@@ -48,7 +56,27 @@ class DBTree(QTreeView):
 		try:
 			return item.database()
 		except TypeError:	# it's a DBPlugin class object, no database
-			return None
+			pass
+		return None
+
+	def currentSchema(self):
+		item = self.currentItem()
+		if item == None: return
+		from .db_plugins.plugin import Schema
+		if isinstance(item, Schema):
+			return item
+		if hasattr(item, 'schema'):
+			return item.schema()
+		return None
+
+	def currentTable(self):
+		item = self.currentItem()
+		if item == None: return
+		from .db_plugins.plugin import Table
+		if isinstance(item, Table):
+			return item
+		return None
+			
 
 	def itemChanged(self, indexFrom, indexTo=None):
 		self.setCurrentIndex(indexFrom)

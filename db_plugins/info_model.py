@@ -31,7 +31,6 @@ class DatabaseInfo:
 		self.db = db
 
 	def __del__(self):
-		print "DatabaseInfo.__del__"
 		self.db = None
 
 	def generalInfo(self):
@@ -132,7 +131,6 @@ class SchemaInfo:
 		self.schema = schema
 
 	def __del__(self):
-		print "SchemaInfo.__del__"
 		self.schema = None
 
 	def generalInfo(self):
@@ -178,7 +176,6 @@ class TableInfo:
 		self.table = table
 
 	def __del__(self):
-		print "TableInfo.__del__"
 		self.table = None
 
 	def generalInfo(self):

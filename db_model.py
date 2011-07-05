@@ -35,15 +35,15 @@ except ImportError:
 class TreeItem(QObject):
 	def __init__(self, data, parent=None):
 		QObject.__init__(self, parent)
-		self.populated = True
+		self.populated = False
 		self.itemData = data
 		self.childItems = []
 		if parent: 
 			parent.appendChild(self)
 
 	def populate(self):
-		return False
-
+		self.populated = True
+		return True
 
 	def getItemData(self):
 		return self.itemData
@@ -77,10 +77,20 @@ class TreeItem(QObject):
 class PluginItem(TreeItem):
 	def __init__(self, dbplugin, parent=None):
 		TreeItem.__init__(self, dbplugin, parent)
+		self.populate()
+
+	def populate(self):
+		if self.populated:
+			return True
 
 		# create items for connections
 		for c in self.getItemData().connections():
 			ConnectionItem(c, self)
+
+		self.populated = True
+		QApplication.restoreOverrideCursor()
+		return True
+
 
 	def data(self, column):
 		if column == 0:
@@ -94,7 +104,6 @@ class PluginItem(TreeItem):
 class ConnectionItem(TreeItem):
 	def __init__(self, connection, parent=None):
 		TreeItem.__init__(self, connection, parent)
-		self.populated = False
 
 	def data(self, column):
 		if column == 0:
@@ -106,21 +115,23 @@ class ConnectionItem(TreeItem):
 			return True
 
 		connection = self.getItemData()
-		try:
-			if not connection.connect():
+		if connection.database() == None:
+			# connect to database
+			try:
+				if not connection.connect():
+					return False
+
+			except (InvalidDataException, ConnectionError), e:
+				QMessageBox.warning( None, u"Unable to connect", unicode(e) )
 				return False
 
-		except (InvalidDataException, ConnectionError), e:
-			QMessageBox.warning( None, u"Unable to connect", unicode(e) )
-			return False
-
 		QApplication.setOverrideCursor(Qt.WaitCursor)
-		schemas = connection.db.schemas()
+		schemas = connection.database().schemas()
 		if schemas != None:
 			for s in schemas:
 				SchemaItem(s, self)
 		else:
-			tables = connection.db.tables()
+			tables = connection.database().tables()
 			for t in tables:
 				TableItem(t, self)
 
@@ -132,7 +143,6 @@ class ConnectionItem(TreeItem):
 class SchemaItem(TreeItem):
 	def __init__(self, schema, parent):
 		TreeItem.__init__(self, schema, parent)
-		self.populated = False
 
 		# load (shared) icon with first instance of schema item
 		if not hasattr(SchemaItem, 'schemaIcon'):
@@ -162,6 +172,7 @@ class SchemaItem(TreeItem):
 class TableItem(TreeItem):
 	def __init__(self, table, parent):
 		TreeItem.__init__(self, table, parent)
+		self.populate()
 		
 		# load (shared) icon with first instance of table item
 		if not hasattr(TableItem, 'tableIcon'):
@@ -204,6 +215,51 @@ class DBModel(QAbstractItemModel):
 		for dbtype in supportedDbTypes():
 			dbpluginclass = createDbPlugin( dbtype )
 			PluginItem( dbpluginclass, self.rootItem )
+
+
+	def refreshItem(self, item, removed=False):
+		# find the index for the item
+		index = self._rItem2Index( self._createPathForItem(item) )
+		if index.isValid():
+			if removed:
+				# remove child
+				self.removeRows(index.row(), 1, index.parent())
+				self._onDataChanged(index.parent())
+			else:
+				self.refreshIndex(index)
+
+	def _createPathForItem(self, item):
+		path = []
+		if item == None:
+			return path
+		try:
+			path.append( createDbPlugin(item.database().connection().typeName()) )
+		except TypeError:
+			path.append( item )	# it's a DBPlugin class object, no database
+		else:
+			from .db_plugins.plugin import DBPlugin, Schema, Table
+			if isinstance(item, Table):
+				if item.schema() != None:
+					path.extend( [item.database().connection(), item.schema(), item] )
+				else:
+					path.extend( [item.database().connection(), item] )
+			elif isinstance(item, Schema):
+				path.extend( [item.database().connection(), item] )
+			else:
+				path.append( item )
+		return path
+
+	def _rItem2Index(self, item, parent=None):
+		if parent == None:
+			parent = QModelIndex()
+		if item == None or len(item) == 0:
+			return parent
+		for i in range( self.rowCount(parent) ):
+			index = self.index(i, 0, parent)
+			if self.getItem( index ) == item[0]:
+				return self._rItem2Index( item[1:], index )
+		return QModelIndex()
+
 
 	def getItem(self, index):
 		if not index.isValid():
@@ -299,6 +355,18 @@ class DBModel(QAbstractItemModel):
 
 		return False
 
+	def removeRows(self, row, count, parent):
+		self.beginRemoveRows(parent, row, count+row-1)
+		item = parent.internalPointer()
+		for i in range(row, count+row):
+			del item.childItems[row]
+		self.endRemoveRows()
+
+	def refreshIndex(self, index):
+		self.removeRows(0, self.rowCount(index), index)
+		index.internalPointer().populated = False
+		if index.internalPointer().populate():
+			self._onDataChanged(index)		
 
 	def _onDataChanged(self, indexFrom, indexTo=None):
 		if indexTo == None: indexTo = indexFrom
