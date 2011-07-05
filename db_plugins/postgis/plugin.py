@@ -211,7 +211,7 @@ class PGTableTrigger(TableTrigger):
 
 class PGTableRule(TableRule):
 	def __init__(self, row, table):
-		TableSubItem.__init__(self, table)
+		TableRule.__init__(self, table)
 		self.name, self.definition = row
 
 
