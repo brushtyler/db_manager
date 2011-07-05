@@ -91,7 +91,7 @@ class InfoViewer(QTextBrowser):
 
 	def setHtml(self, html):
 		# convert special tags :)
-		html = unicode(html).replace( '<warning>', '<img src=":/icons/warning-20px.png">&nbsp;&nbsp; ' )
+		html = unicode(html).replace( '<warning>', '<img src=":/db_manager/warning">&nbsp;&nbsp; ' )
 
 		# add default style
 		html = u"""

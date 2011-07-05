@@ -39,7 +39,7 @@ class SpatiaLiteDBPlugin(DBPlugin):
 
 	@classmethod
 	def icon(self):
-		return QIcon(":/icons/spatialite_icon.png")
+		return QIcon(":/db_manager/spatialite/icon")
 
 	@classmethod
 	def typeName(self):

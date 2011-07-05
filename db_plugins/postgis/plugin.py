@@ -39,7 +39,7 @@ class PostGisDBPlugin(DBPlugin):
 
 	@classmethod
 	def icon(self):
-		return QIcon(":/icons/postgis_elephant.png")
+		return QIcon(":/db_manager/postgis/icon")
 
 	@classmethod
 	def typeName(self):

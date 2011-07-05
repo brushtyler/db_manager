@@ -236,14 +236,12 @@ class DBManager(QMainWindow):
 		self.addToolBar(self.toolBar)
 
 		# create menus' actions
-		# menuDb
-		self.actionRefresh = self.menuDb.addAction( QIcon(":/db_manager/refresh"), "&Refresh", self.refreshItem, QKeySequence("F5") )
-		self.actionSqlWindow = self.menuDb.addAction( QIcon(":/db_manager/sql_window"), "&SQL window", self.showSqlWindow, QKeySequence("F2") )
+		# menu DATABASE
+		self.actionRefresh = self.menuDb.addAction( QIcon(":/db_manager/actions/refresh"), "&Refresh", self.refreshItem, QKeySequence("F5") )
+		self.actionSqlWindow = self.menuDb.addAction( QIcon(":/db_manager/actions/sql_window"), "&SQL window", self.showSqlWindow, QKeySequence("F2") )
 		self.actionClose = self.menuDb.addAction( QIcon(), "&Exit", self.close, QKeySequence("CTRL+Q") )
-		# menuTable
-		#self.actionEmptyTable = self.menuTable.addAction("E&mpty table", self.emptyTable)
-		#self.actionDeleteTable = self.menuTable.addAction(QIcon(":/db_manager/del_table"),"&Delete table/view", self.deleteTable)
-		# menuHelp
+
+		# menu HELP
 		#self.actionAbout = self.menuHelp.addAction("&About", self.about)
 
 		# add actions to the toolbar

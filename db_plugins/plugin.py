@@ -157,7 +157,7 @@ class Database(DbItemObject):
 		if self.schemas() != None:
 			action = QAction("&Delete (empty) schema", self)
 			mainWindow.registerAction( action, "&Schema", self.deleteSchema )
-		action = QAction(QIcon(":/db_manager/del_table"), "&Delete table/view", self)
+		action = QAction(QIcon(":/db_manager/actions/del_table"), "&Delete table/view", self)
 		mainWindow.registerAction( action, "&Table", self.deleteTable )
 		action = QAction("&Empty table", self)
 		mainWindow.registerAction( action, "&Table", self.emptyTable )

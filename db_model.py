@@ -146,7 +146,7 @@ class SchemaItem(TreeItem):
 
 		# load (shared) icon with first instance of schema item
 		if not hasattr(SchemaItem, 'schemaIcon'):
-			SchemaItem.schemaIcon = QIcon(":/icons/namespace.png")
+			SchemaItem.schemaIcon = QIcon(":/db_manager/icons/namespace.png")
 
 	def data(self, column):
 		if column == 0:
@@ -176,12 +176,12 @@ class TableItem(TreeItem):
 		
 		# load (shared) icon with first instance of table item
 		if not hasattr(TableItem, 'tableIcon'):
-			TableItem.tableIcon = QIcon(":/icons/table.png")
-			TableItem.viewIcon = QIcon(":/icons/view.png")
-			TableItem.layerPointIcon = QIcon(":/icons/layer_point.png")
-			TableItem.layerLineIcon = QIcon(":/icons/layer_line.png")
-			TableItem.layerPolygonIcon = QIcon(":/icons/layer_polygon.png")
-			TableItem.layerUnknownIcon = QIcon(":/icons/layer_unknown.png")
+			TableItem.tableIcon = QIcon(":/db_manager/icons/table.png")
+			TableItem.viewIcon = QIcon(":/db_manager/icons/view.png")
+			TableItem.layerPointIcon = QIcon(":/db_manager/icons/layer_point.png")
+			TableItem.layerLineIcon = QIcon(":/db_manager/icons/layer_line.png")
+			TableItem.layerPolygonIcon = QIcon(":/db_manager/icons/layer_polygon.png")
+			TableItem.layerUnknownIcon = QIcon(":/db_manager/icons/layer_unknown.png")
 			
 	def data(self, column):
 		if column == 0:
