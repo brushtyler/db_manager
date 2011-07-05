@@ -158,7 +158,7 @@ class PGTableInfo(TableInfo):
 		if rules_details == None:
 			pass
 		else:
-			ret.append( HtmlSection( 'Rules', rules_info ) )
+			ret.append( HtmlSection( 'Rules', rules_details ) )
 
 		return ret
 
