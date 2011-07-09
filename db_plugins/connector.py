@@ -26,13 +26,17 @@ from PyQt4.QtGui import *
 class DBConnector:
 	def __init__(self, uri):
 		self.connection = None
-		self.uri = uri
+		self._uri = uri
 
 	def __del__(self):
-		print "DBConnector.__del__", self.uri.uri()
+		print "DBConnector.__del__", self._uri.uri()
 		if self.connection != None: 
 			self.connection.close()
 		self.connection = None
+
+	def uri(self):
+		import qgis.core
+		return qgis.core.QgsDataSourceURI( self._uri.uri() )
 
 	def hasCustomQuerySupport(self):
 		return False

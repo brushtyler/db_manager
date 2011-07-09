@@ -27,6 +27,9 @@ from .info_viewer import InfoViewer
 from .layer_preview import LayerPreview
 from .db_tree import DBTree
 
+from .db_plugins.plugin import DbError
+from .dlg_db_error import DlgDbError
+
 
 class DBManager(QMainWindow):
 
@@ -41,6 +44,7 @@ class DBManager(QMainWindow):
 		self.restoreGeometry( settings.value("/DB_Manager/geometry").toByteArray() )
 		self.restoreState( settings.value("/DB_Manager/windowState").toByteArray() )
 
+		self.connect(self.tabs, SIGNAL("currentChanged(int)"), self.tabChanged)
 		self.connect(self.tree, SIGNAL("currentChanged"), self.itemChanged)
 		self.itemChanged(None)
 
@@ -56,8 +60,10 @@ class DBManager(QMainWindow):
 
 
 	def refreshItem(self, item=None):
-		self.tree.refreshItem(item)
-		self.info.refresh()
+		if item == None:
+			item = self.tree.currentItem()
+		self.tree.refreshItem(item)	# refresh item children in the db tree
+		self.info.refresh()	# refresh info about the current selected item
 
 	def removeItem(self, item=None):
 		self.tree.refreshItem(item, True)
@@ -65,8 +71,7 @@ class DBManager(QMainWindow):
 
 	def itemChanged(self, item):
 		self.reloadButtons()
-		self.refreshTabs( item )
-
+		self.refreshTabs()
 
 	def reloadButtons(self):
 		db = self.tree.currentDatabase()
@@ -88,18 +93,21 @@ class DBManager(QMainWindow):
 			self.connect( self._lastDb, SIGNAL("contentChanged"), self.refreshItem )
 			self.connect( self._lastDb, SIGNAL("contentRemoved"), self.removeItem )
 
+	def tabChanged(self, index):
+		self.refreshTabs()
 
-	def refreshTabs(self, item):
+	def refreshTabs(self):
+		index = self.tabs.currentIndex()
+		item  = self.tree.currentItem()
+		table  = self.tree.currentTable()
+
 		# enable/disable tabs
-		self.tabs.setTabEnabled( self.tabs.indexOf(self.info), item != None )
-		self.tabs.setTabEnabled( self.tabs.indexOf(self.table), False )
-		self.tabs.setTabEnabled( self.tabs.indexOf(self.preview), False )
+		self.tabs.setTabEnabled( self.tabs.indexOf(self.table), False)#table != None )
+		self.tabs.setTabEnabled( self.tabs.indexOf(self.preview), table != None and table.geomColumn != None )
 
-		if not self.tabs.isTabEnabled( self.tabs.currentIndex() ):
-			for i in range(self.tabs.count()):
-				if self.tabs.isTabEnabled( i ):
-					self.tabs.setCurrentWidget(i)
-					break
+		# show the info tab if the current tab is disabled
+		if not self.tabs.isTabEnabled( index ):
+			self.tabs.setCurrentWidget( self.info )
 
 		current_tab = self.tabs.currentWidget()
 		if current_tab == self.info:
@@ -107,8 +115,7 @@ class DBManager(QMainWindow):
 		elif current_tab == self.table:
 			pass
 		elif current_tab == self.preview:
-			self.preview.load( item )
-
+			self.preview.loadPreview( item )
 
 	def showSqlWindow(self):
 		db = self.tree.currentDatabase()
@@ -162,7 +169,10 @@ class DBManager(QMainWindow):
 	def __invokeCallback(self, callback):
 		action = self.sender
 		selected_item = self.tree.currentItem()
-		return callback( selected_item, action, self ) 
+		try:
+			callback( selected_item, action, self ) 
+		except DbError, e:
+			DlgDbError.showError(e, self)
 
 	def unregisterAction(self, action, menu):
 		if not hasattr(self, '_registeredDbActions'):

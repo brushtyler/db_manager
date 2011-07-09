@@ -50,6 +50,10 @@ class PostGisDBPlugin(DBPlugin):
 		return 'PostGIS'
 
 	@classmethod
+	def providerName(self):
+		return 'postgres'
+
+	@classmethod
 	def connectionSettingsKey(self):
 		return '/PostgreSQL/connections'
 
@@ -122,10 +126,7 @@ class PGTable(Table):
 
 		if action.startswith( "table/" ):
 			if action == "table/vacuum":
-				try:
-					self.runVacuumAnalyze()
-				except DbError:
-					raise
+				self.runVacuumAnalyze()
 				return True
 
 		elif action.startswith( "rule/" ):
@@ -138,10 +139,8 @@ class PGTable(Table):
 				return False
 
 			if rule_action == "delete":
-				try:
-					self.database().connector.deleteTableRule(rule_name, self.name, self.schemaName())
-				except DbError:
-					raise
+				self.database().connector.deleteTableRule(rule_name, self.name, self.schemaName())
+				self._rules = None	# refresh rules
 				return True
 
 		return Table.runAction(self, action)
@@ -165,6 +164,23 @@ class PGTable(Table):
 	def info(self):
 		from .info_model import PGTableInfo
 		return PGTableInfo(self)
+
+	def getValidUniqueFields(self, onlyOne=False):
+		""" list of fields valid to load the table as layer in qgis canvas """
+		ret = Table.getUniqueFieldsForLayer(self)
+
+		# add both serial and int4 fields with an unique index
+		indexes = self.indexes()
+		if indexes != None:
+			for idx in indexes:
+				if idx.isUnique and len(idx.columns) == 1:
+					fld = idx.fields()[0]
+					if fld and fld not in ret and fld.type in ["oid", "serial", "int4"]:
+						ret.append( fld )
+
+		if onlyOne:
+			return ret if len(ret) > 0 else None
+		return ret
 
 
 class PGTableField(TableField):

@@ -42,14 +42,14 @@ class PostGisDBConnector(DBConnector):
 			self.dbname = self.user
 		
 		try:
-			self.connection = psycopg2.connect( self.__connectionInfo() )
+			self.connection = psycopg2.connect( self._connectionInfo() )
 		except psycopg2.OperationalError, e:
 			raise ConnectionError(e)
 		
-		self.__checkSpatial()
-		self.__checkGeometryColumnsTable()
+		self._checkSpatial()
+		self._checkGeometryColumnsTable()
 
-	def __connectionInfo(self):
+	def _connectionInfo(self):
 		conn_str = u''
 		if self.host:   conn_str += "host='%s' "     % self.host
 		if self.port:   conn_str += "port=%s "       % self.port
@@ -59,14 +59,14 @@ class PostGisDBConnector(DBConnector):
 		return conn_str
 
 
-	def __checkSpatial(self):
+	def _checkSpatial(self):
 		""" check whether postgis_version is present in catalog """
 		c = self.connection.cursor()
 		self._exec_sql(c, u"SELECT COUNT(*) FROM pg_proc WHERE proname = 'postgis_version'")
 		self.has_spatial = c.fetchone()[0] > 0
 		return self.has_spatial
 	
-	def __checkGeometryColumnsTable(self):
+	def _checkGeometryColumnsTable(self):
 		c = self.connection.cursor()
 		self._exec_sql(c, u"SELECT relname FROM pg_class WHERE relname = 'geometry_columns' AND pg_class.relkind IN ('v', 'r')")
 		self.has_geometry_columns = (len(c.fetchall()) != 0)
@@ -480,7 +480,7 @@ class PostGisDBConnector(DBConnector):
 		except psycopg2.Error, e:
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self.connection.rollback()
-			raise DbError(e)
+			raise DbError(e, sql)
 		
 	def _exec_sql_and_commit(self, sql):
 		""" tries to execute and commit some action, on error it rolls back the change """

@@ -16,6 +16,7 @@ class DlgDbError(QDialog, Ui_DlgDbError):
 			query = "<pre>" + e.query.replace('<','&lt;') + "</pre>"
 			self.txtQuery.setHtml(query)
 
+
 	@staticmethod
 	def showError(e, parent=None):
 		dlg = DlgDbError(e, parent)

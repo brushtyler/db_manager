@@ -37,22 +37,22 @@ class SpatiaLiteDBConnector(DBConnector):
 
 		self.dbname = uri.database()
 		try:
-			self.connection = sqlite.connect( self.__connectionInfo() )
+			self.connection = sqlite.connect( self._connectionInfo() )
 		except sqlite.OperationalError, e:
 			raise ConnectionError(e)
 
-		self.__checkSpatial()
-		self.__checkGeometryColumnsTable()
+		self._checkSpatial()
+		self._checkGeometryColumnsTable()
 
-	def __connectionInfo(self):
+	def _connectionInfo(self):
 		return '%s' % self.dbname
 	
-	def __checkSpatial(self):
+	def _checkSpatial(self):
 		""" check if is a valid spatialite db """
-		self.has_spatial = self.__checkGeometryColumnsTable()
+		self.has_spatial = self._checkGeometryColumnsTable()
 		return self.has_spatial
 
-	def __checkGeometryColumnsTable(self):
+	def _checkGeometryColumnsTable(self):
 		try:
 			c = self.connection.cursor()
 			self._exec_sql(c, u"SELECT CheckSpatialMetaData()")
@@ -272,7 +272,7 @@ class SpatiaLiteDBConnector(DBConnector):
 		except sqlite.Error, e:
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self.connection.rollback()
-			raise DbError(e)
+			raise DbError(e, sql)
 		
 	def _exec_sql_and_commit(self, sql):
 		""" tries to execute and commit some action, on error it rolls back the change """

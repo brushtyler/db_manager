@@ -53,6 +53,11 @@ class TreeItem(QObject):
 	
 	def child(self, row):
 		return self.childItems[row]
+
+	def removeChild(self, row):
+		if row >= 0 and row < len(self.childItems):
+			self.childItems[row].itemData.deleteLater()
+			del self.childItems[row]
 	
 	def childCount(self):
 		return len(self.childItems)
@@ -359,7 +364,7 @@ class DBModel(QAbstractItemModel):
 		self.beginRemoveRows(parent, row, count+row-1)
 		item = parent.internalPointer()
 		for i in range(row, count+row):
-			del item.childItems[row]
+			item.removeChild(row)
 		self.endRemoveRows()
 
 	def refreshIndex(self, index):

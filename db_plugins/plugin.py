@@ -67,14 +67,12 @@ class DBPlugin(QObject):
 	def connectionName(self):
 		return self.connName
 
-
 	def database(self):
 		return self.db
 
 	def info(self):
 		from .info_model import DatabaseInfo
 		return DatabaseInfo(None)
-
 
 	def connect(self):
 		return False
@@ -91,6 +89,11 @@ class DBPlugin(QObject):
 	@classmethod
 	def typeNameString(self):
 		# return the db typename string (e.g. 'PostGIS')
+		pass
+
+	@classmethod
+	def providerName(self):
+		# return the provider's name (e.g. 'postgres')
 		pass
 
 	@classmethod
@@ -111,7 +114,7 @@ class DBPlugin(QObject):
 
 
 	def databasesFactory(self, connection, uri):
-		return None
+		return None 
 
 
 class DbItemObject(QObject):
@@ -142,11 +145,21 @@ class Database(DbItemObject):
 	def connectorsFactory(self, uri):
 		return None
 
+	def __del__(self):
+		print "Database.__del__", self
+		#self.connector = None
+
 	def connection(self):
+		return self.parent()
+
+	def dbplugin(self):
 		return self.parent()
 
 	def database(self):
 		return self
+
+	def uri(self):
+		return self.connector.uri()
 
 	def info(self):
 		from .info_model import DatabaseInfo
@@ -209,7 +222,7 @@ class Database(DbItemObject):
 		if res != QMessageBox.Yes:
 			return False
 		self.connector.emptyTable(item.name, item.schemaName())
-		item.refresh()	#TODO refresh the item data
+		item.rowCount = 0
 		self.emit( SIGNAL('contentChanged'), item )
 		return True
 
@@ -219,6 +232,10 @@ class Schema(DbItemObject):
 		DbItemObject.__init__(self, db)
 		self.oid = self.name = self.owner = self.perms = None
 		self.tableCount = 0
+
+	def __del__(self):
+		print "Schema.__del__", self
+		#self.connector = None
 
 	def database(self):
 		return self.parent()
@@ -236,7 +253,7 @@ class Table(DbItemObject):
 	def __init__(self, db, schema=None, parent=None):
 		DbItemObject.__init__(self, db)
 		self._schema = schema
-		self.name = self.isView = self.owner = self.pages = self.geomCol = self.geomType = self.geomDim = self.srid = None
+		self.name = self.isView = self.owner = self.pages = self.geomColumn = self.geomType = self.geomDim = self.srid = None
 		self.rowCount = None
 
 		self._fields = self._indexes = self._constraints = self._triggers = self._rules = None
@@ -252,6 +269,9 @@ class Table(DbItemObject):
 
 	def schemaName(self):
 		return self.schema().name if self.schema() else None
+
+	def quotedName(self):
+		return self.database().connector.quoteId( (self.schemaName(), self.name) )
 
 	def info(self):
 		from .info_model import TableInfo
@@ -335,10 +355,8 @@ class Table(DbItemObject):
 
 			if trigger_action == "enable" or trigger_action == "disable":
 				enable = trigger_action == "enable"
-				try:
-					self.database().connector.enableAllTableTriggers(enable, self.name, self.schemaName())
-				except DbError:
-					raise
+				self.database().connector.enableAllTableTriggers(enable, self.name, self.schemaName())
+				self._triggers = None	# refresh triggers
 				return True
 
 		elif action.startswith( "trigger/" ):
@@ -351,21 +369,51 @@ class Table(DbItemObject):
 				return False
 
 			if trigger_action == "delete":
-				try:
-					self.database().connector.deleteTableTrigger(trigger_name, self.name, self.schemaName())
-				except DbError:
-					raise
+				self.database().connector.deleteTableTrigger(trigger_name, self.name, self.schemaName())
+				self._triggers = None	# refresh triggers
 				return True
 
 			elif trigger_action == "enable" or trigger_action == "disable":
 				enable = trigger_action == "enable"
-				try:
-					self.database().connector.enableTableTrigger(trigger_name, enable, self.name, self.schemaName())
-				except DbError:
-					raise
+				self.database().connector.enableTableTrigger(trigger_name, enable, self.name, self.schemaName())
+				self._triggers = None	# refresh triggers
 				return True
 
 		return False
+
+
+	def uri(self):
+		uri = self.database().uri()
+		schema = self.schemaName() if self.schemaName() else ''
+		uri.setDataSource(schema, self.name, self.geomColumn)
+		return uri
+
+	def getMapLayer(self):
+		from qgis.core import QgsVectorLayer
+		provider = self.database().dbplugin().providerName()
+		return QgsVectorLayer(self.uri().uri(), self.name, provider)
+
+
+	def getValidUniqueFields(self, onlyOne=False):
+		""" list of fields valid to load the table as layer in qgis canvas """
+		ret = []
+
+		# add the pk
+		pkcols = filter(lambda x: x.primaryKey, self.fields())
+		if len(pkcols) == 1: ret.append( pkcols[0] )
+
+		"""constraints = self.constraints()
+		if constraints != None:
+			for con in constraints:
+				if con.type in [TableConstraint.TypePrimaryKey] and \
+						len(con.columns) == 1:
+					fld = con.fields()[0]
+					if fld and fld not in ret: 
+						ret.append( fld )"""
+
+		if onlyOne:
+			return ret if len(ret) > 0 else None
+		return ret
 
 
 class TableSubItemObject(QObject):
@@ -412,7 +460,7 @@ class TableConstraint(TableSubItemObject):
 
 	def __init__(self, table):
 		TableSubItemObject.__init__(self, table)
-		self.name = self.type = self.columns = None
+		self.name = self.type = self._columns = None
 
 	def type2String(self):
 		if self.type == TableConstraint.TypeCheck: return "Check"
@@ -421,11 +469,38 @@ class TableConstraint(TableSubItemObject):
 		if self.type == TableConstraint.TypeUnique: return "Unique"
 		return 'Unknown'
 
+	def fields(self):
+		def fieldFromNum(num, fields):
+			""" return field specified by its number or None if doesn't exist """
+			for fld in fields:
+				if fld.num == num:
+					return fld
+			return None
+
+		fields = self.table().fields()
+		cols = {}
+		for num in self.columns:
+			cols[num] = fieldFromNum(num, fields)
+		return cols
+
 
 class TableIndex(TableSubItemObject):
 	def __init__(self, table):
 		TableSubItemObject.__init__(self, table)
 		self.name = self.columns = self.isUnique = None
+
+	def fields(self):
+		def fieldFromNum(num, fields):
+			""" return field specified by its number or None if doesn't exist """
+			for fld in fields:
+				if fld.num == num: return fld
+			return None
+
+		fields = self.table().fields()
+		cols = {}
+		for num in self.columns:
+			cols[num] = fieldFromNum(num, fields)
+		return cols
 
 class TableTrigger(TableSubItemObject):
 	""" class that represents a trigger """

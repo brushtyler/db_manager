@@ -258,13 +258,6 @@ class TableInfo:
 		return ret
 
 
-	def _fieldNum2Name(self, num):
-		""" return field specified by its number or None if doesn't exist """
-		for fld in self.table.fields():
-			if fld.num == num:
-				return fld.name
-		return u"??? (#%d)" % num
-
 	def constraintsDetails(self):
 		if self.table.constraints() == None or len(self.table.constraints()) <= 0:
 			return None
@@ -278,9 +271,7 @@ class TableInfo:
 		# add table contents
 		for con in self.table.constraints():
 			# get the fields the constraint is defined on 
-			cols = []
-			for num in con.columns:
-				cols.append( self._fieldNum2Name(num) )
+			cols = map(lambda p: p[1].name if p[1] != None else u"??? (#%d)" % p[0], con.fields().iteritems())
 			tbl.append( (con.name, con.type2String(), u'\n'.join(cols)) )
 
 		return HtmlTable( tbl, {"class":"header"} )
@@ -299,10 +290,7 @@ class TableInfo:
 		# add table contents
 		for idx in self.table.indexes():
 			# get the fields the index is defined on 
-			fields = self.table.fields()
-			cols = []
-			for num in idx.columns:
-				cols.append( self._fieldNum2Name(num) )
+			cols = map(lambda p: p[1].name if p[1] != None else u"??? (#%d)" % p[0], idx.fields().iteritems())
 			tbl.append( (idx.name, u'\n'.join(cols)) )
 
 		return HtmlTable( tbl, {"class":"header"} )

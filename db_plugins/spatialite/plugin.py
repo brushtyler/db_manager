@@ -50,6 +50,10 @@ class SpatiaLiteDBPlugin(DBPlugin):
 		return 'SpatiaLite'
 
 	@classmethod
+	def providerName(self):
+		return 'spatialite'
+
+	@classmethod
 	def connectionSettingsKey(self):
 		return '/SpatiaLite/connections'
 
@@ -108,6 +112,17 @@ class SLTable(Table):
 
 	def tableTriggersFactory(self, row, table):
 		return SLTableTrigger(row, table)
+
+
+	def uri(self):
+		uri = self.database().uri()
+		uri.setDataSource('', self.name.lower(), self.geomColumn)
+		return uri
+
+	def getValidUniqueFields(self, onlyOne=False):
+		""" list of fields valid to load the table as layer in qgis canvas """
+		return [ "ROWID" ] if not onlyOne else "ROWID"
+
 
 
 class SLTableField(TableField):

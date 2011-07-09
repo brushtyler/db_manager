@@ -23,44 +23,50 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from .db_plugins.plugin import DBPlugin, Schema, Table
-
-from .db_plugins.html_elems import HtmlContent
+from .db_plugins.plugin import DbError, DBPlugin, Schema, Table
+from .dlg_db_error import DlgDbError
 
 class InfoViewer(QTextBrowser):
 
 	def __init__(self, parent=None):
 		QTextBrowser.__init__(self, parent)
 		self.setOpenLinks(False)
+		self._clear()
 		self.connect(self, SIGNAL("anchorClicked(const QUrl&)"), self._linkClicked)
-		self.__clear()
 
 	def _linkClicked(self, url):
 		if self.item == None:
 			return
 
 		if url.scheme() == "action":
-			if self.item.runAction( url.path() ):
-				self.refresh()
+			try:
+				if self.item.runAction( url.path() ):
+					self.refresh()
+			except DbError, e:
+				DlgDbError.showError(e, self)
 
 	def refresh(self):
-		return self.showInfo( self.item )		
+		self.showInfo( self.item, True )		
 
-	def showInfo(self, item):
+	def showInfo(self, item, force=False):
+		if item == self.item and not force: 
+			return
+
 		self.item = item
 		if isinstance(item, DBPlugin):
-			return self.__showDatabaseInfo(item)
+			self._showDatabaseInfo(item)
 		elif isinstance(item, Schema):
-			return self.__showSchemaInfo(item)
+			self._showSchemaInfo(item)
 		elif isinstance(item, Table):
-			return self.__showTableInfo(item)
-		return self.__clear()
+			self._showTableInfo(item)
+		else:
+			self._clear()
 
-	def __clear(self):
+	def _clear(self):
 		self.item = None
 		self.setHtml("")
 
-	def __showDatabaseInfo(self, connection):
+	def _showDatabaseInfo(self, connection):
 		html  = u'<div style="background-color:#ccffcc;"><h1>&nbsp;%s</h1></div>' % connection.connectionName()
 		html += '<div style="margin-left:8px;">'
 		if connection.database() == None:
@@ -71,7 +77,7 @@ class InfoViewer(QTextBrowser):
 		self.setHtml(html)
 	
 	
-	def __showSchemaInfo(self, schema):
+	def _showSchemaInfo(self, schema):
 		html  = u'<div style="background-color:#ffcccc;"><h1>&nbsp;%s</h1></div>' % schema.name
 		html += '<div style="margin-left:8px;">'
 		html += schema.info().toHtml()
@@ -79,7 +85,7 @@ class InfoViewer(QTextBrowser):
 		self.setHtml(html)
 
 
-	def __showTableInfo(self, table):		
+	def _showTableInfo(self, table):		
 		html = '<div style="background-color:#ccccff"><h1>&nbsp;%s</h1></div>' % table.name
 		html += '<div style="margin-left:8px;">'
 		html += table.info().toHtml()
