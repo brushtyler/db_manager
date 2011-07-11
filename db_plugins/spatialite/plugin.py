@@ -97,6 +97,10 @@ class SLDatabase(Database):
 		from .info_model import SLDatabaseInfo
 		return SLDatabaseInfo(self)
 
+	def sqlDataModel(self, sql, parent):
+		from .data_model import SLSqlModel
+		return SLSqlModel(self, sql, parent)
+
 
 class SLTable(Table):
 	def __init__(self, row, db, schema=None):
@@ -112,6 +116,11 @@ class SLTable(Table):
 
 	def tableTriggersFactory(self, row, table):
 		return SLTableTrigger(row, table)
+
+
+	def dataModel(self, parent):
+		from .data_model import SLTableModel
+		return SLTableModel(self, parent)
 
 
 	def uri(self):

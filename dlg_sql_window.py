@@ -12,11 +12,11 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 
 	def __init__(self, parent=None, db=None):
 		QDialog.__init__(self, parent)
-		self.db = db.connector
+		self.db = db
 		self.setupUi(self)
 
 		settings = QSettings()
-		self.restoreGeometry(settings.value("/PostGIS_Manager/sql_geometry").toByteArray())
+		self.restoreGeometry(settings.value("/DB_Manager/sqlWindow/geometry").toByteArray())
 		
 		self.connect(self.btnExecute, SIGNAL("clicked()"), self.executeSql)
 		self.connect(self.btnClear, SIGNAL("clicked()"), self.clearSql)
@@ -32,7 +32,7 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 	def closeEvent(self, e):
 		""" save window state """
 		settings = QSettings()
-		settings.setValue("/PostGIS_Manager/sql_geometry", QVariant(self.saveGeometry()))
+		settings.setValue("/DB_Manager/sqlWindow/geometry", QVariant(self.saveGeometry()))
 		
 		QDialog.closeEvent(self, e)
 
@@ -49,14 +49,23 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 			return
 
 		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
+
+		# delete the old model 
+		old_model = self.viewResult.model()
+		self.viewResult.setModel(None)
+		if old_model: old_model.deleteLater()
+
 		try:
-			model, secs, rowcount = self.db.getSqlTableModel( sql, self )
+			# set the new model 
+			model = self.db.sqlDataModel( sql, self )
 			self.viewResult.setModel( model )
-			self.update()
-			self.lblResult.setText("%d rows, %.1f seconds" % (rowcount, secs))
-			QApplication.restoreOverrideCursor()
-		
+			self.lblResult.setText("%d rows, %.1f seconds" % (model.rowCount(), model.secs()))
+
 		except DbError, e:
 			QApplication.restoreOverrideCursor()
 			DlgDbError.showError(e, self)
+
+		else:
+			self.update()
+			QApplication.restoreOverrideCursor()
 

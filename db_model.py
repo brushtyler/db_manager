@@ -238,7 +238,8 @@ class DBModel(QAbstractItemModel):
 		if item == None:
 			return path
 		try:
-			path.append( createDbPlugin(item.database().connection().typeName()) )
+			if item.database() != None:
+				path.append( createDbPlugin(item.database().connection().typeName()) )
 		except TypeError:
 			path.append( item )	# it's a DBPlugin class object, no database
 		else:

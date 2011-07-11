@@ -66,37 +66,3 @@ class DBConnector:
 		txt = unicode(txt) if txt != None else unicode() # make sure it's python unicode string
 		return u"'%s'" % txt.replace("'", "''")
 
-
-class SqlTableModel(QAbstractTableModel):
-	def __init__(self, parent=None):
-		QAbstractTableModel.__init__(self, parent)
-		self.header = []
-		self.resdata = []
-		
-	def rowCount(self, parent):
-		return len(self.resdata)
-	
-	def columnCount(self, parent):
-		return len(self.header)
-	
-	def data(self, index, role):
-		if role != Qt.DisplayRole:
-			return QVariant()
-		
-		val = self.resdata[ index.row() ][ index.column() ]
-		if val == None:
-			return QVariant("NULL")
-		else:
-			return QVariant(val)		
-	
-	def headerData(self, section, orientation, role):
-		if role != Qt.DisplayRole:
-			return QVariant()
-		
-		if orientation == Qt.Vertical:
-			# header for a row
-			return QVariant(section+1)
-		else:
-			# header for a column
-			return QVariant(self.header[section])
-

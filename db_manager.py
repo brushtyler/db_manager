@@ -24,7 +24,9 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from .info_viewer import InfoViewer
+from .table_viewer import TableViewer
 from .layer_preview import LayerPreview
+
 from .db_tree import DBTree
 
 from .db_plugins.plugin import DbError
@@ -41,8 +43,8 @@ class DBManager(QMainWindow):
 
 		# restore the window state
 		settings = QSettings()
-		self.restoreGeometry( settings.value("/DB_Manager/geometry").toByteArray() )
-		self.restoreState( settings.value("/DB_Manager/windowState").toByteArray() )
+		self.restoreGeometry( settings.value("/DB_Manager/mainWindow/geometry").toByteArray() )
+		self.restoreState( settings.value("/DB_Manager/mainWindow/windowState").toByteArray() )
 
 		self.connect(self.tabs, SIGNAL("currentChanged(int)"), self.tabChanged)
 		self.connect(self.tree, SIGNAL("currentChanged"), self.itemChanged)
@@ -53,8 +55,8 @@ class DBManager(QMainWindow):
 
 		# save the window state
 		settings = QSettings()
-		settings.setValue( "/DB_Manager/windowState", QVariant(self.saveState()) )
-		settings.setValue( "/DB_Manager/geometry", QVariant(self.saveGeometry()) )
+		settings.setValue( "/DB_Manager/mainWindow/windowState", QVariant(self.saveState()) )
+		settings.setValue( "/DB_Manager/mainWindow/geometry", QVariant(self.saveGeometry()) )
 
 		QMainWindow.closeEvent(self, e)
 
@@ -102,7 +104,7 @@ class DBManager(QMainWindow):
 		table  = self.tree.currentTable()
 
 		# enable/disable tabs
-		self.tabs.setTabEnabled( self.tabs.indexOf(self.table), False)#table != None )
+		self.tabs.setTabEnabled( self.tabs.indexOf(self.table), table != None )
 		self.tabs.setTabEnabled( self.tabs.indexOf(self.preview), table != None and table.geomColumn != None )
 
 		# show the info tab if the current tab is disabled
@@ -113,41 +115,21 @@ class DBManager(QMainWindow):
 		if current_tab == self.info:
 			self.info.showInfo( item )
 		elif current_tab == self.table:
-			pass
+			self.table.loadData( item )
 		elif current_tab == self.preview:
 			self.preview.loadPreview( item )
+
 
 	def showSqlWindow(self):
 		db = self.tree.currentDatabase()
 		if db == None:
-			QMessageBox.information(self, "Sorry", "No database selected or you are not connected.")
+			QMessageBox.information(self, "Sorry", "No database selected or you are not connected to it.")
 			return
 
 		from dlg_sql_window import DlgSqlWindow
 		dlg = DlgSqlWindow(self, db)
 		dlg.exec_()
 		self.refreshItem( db.connection() )
-
-	def deleteSchema(self):
-		item = self.tree.currentSchema()
-		if item == None:
-			QMessageBox.information(self, "Sorry", "Select a SCHEMA for deletion.")
-			return
-		res = QMessageBox.question(self, "hey!", u"Really delete schema %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
-		if res != QMessageBox.Yes:
-			return
-		item.delete()
-
-	def deleteTable(self):
-		item = self.tree.currentTable()
-		if item == None:
-			QMessageBox.information(self, "Sorry", "Select a TABLE or VIEW for deletion.")
-			return
-		res = QMessageBox.question(self, "hey!", u"Really delete table/view %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
-		if res != QMessageBox.Yes:
-			return
-		item.delete()
-
 
 
 	def registerAction(self, action, menu, callback):
@@ -208,7 +190,7 @@ class DBManager(QMainWindow):
 		self.tabs = QTabWidget()
 		self.info = InfoViewer(self)
 		self.tabs.addTab(self.info, "Info")
-		self.table = QWidget(self)
+		self.table = TableViewer(self)
 		self.tabs.addTab(self.table, "Table")
 		self.preview = LayerPreview(self)
 		self.tabs.addTab(self.preview, "Preview")

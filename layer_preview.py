@@ -74,18 +74,19 @@ class LayerPreview(QgsMapCanvas):
 		if table == None or table.geomType == None:
 			self.setLayerSet( [] )
 		else:
-			# if the limit checkbox is checked and there is more than 1000 rows, limit the query result
+			# limit the query result if required
 			if limit and table.rowCount > 1000:
 				uniqueField = table.getValidUniqueFields(True)
 				if uniqueField == None:
-					raise Exception( "Unable to find a valid unique field" )
+					QMessageBox.warning(self, "Sorry", "Unable to find a valid unique field")
+					return
 
 				uri = table.database().uri()
 				uri.setDataSource("", u"(SELECT * FROM %s LIMIT 1000)" % table.quotedName(), table.geomColumn, "", uniqueField.name)
 				provider = table.database().dbplugin().providerName()
 				vl = QgsVectorLayer(uri.uri(), table.name, provider)
 			else:
-				vl = table.getMapLayer()
+				vl = table.toMapLayer()
 
 			if not vl.isValid():
 				self.setLayerSet( [] )

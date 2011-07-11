@@ -165,6 +165,9 @@ class Database(DbItemObject):
 		from .info_model import DatabaseInfo
 		return DatabaseInfo(self)
 
+	def sqlDataModel(self, sql, parent):
+		pass
+
 
 	def registerAllActions(self, mainWindow):
 		if self.schemas() != None:
@@ -222,7 +225,7 @@ class Database(DbItemObject):
 		if res != QMessageBox.Yes:
 			return False
 		self.connector.emptyTable(item.name, item.schemaName())
-		item.rowCount = 0
+		item.refreshRowCount()
 		self.emit( SIGNAL('contentChanged'), item )
 		return True
 
@@ -273,9 +276,13 @@ class Table(DbItemObject):
 	def quotedName(self):
 		return self.database().connector.quoteId( (self.schemaName(), self.name) )
 
+
 	def info(self):
 		from .info_model import TableInfo
 		return TableInfo(self)
+
+	def dataModel(self, parent):
+		pass
 
 
 	def tableFieldsFactory(self):
@@ -333,16 +340,20 @@ class Table(DbItemObject):
 		return self._rules
 
 
+	def refreshRowCount(self):
+		try:
+			self.rowCount = self.database().connector.getTableRowCount(self.name, self.schemaName())
+			self.rowCount = int(self.rowCount) if self.rowCount != None else None
+		except DbError:
+			self.rowCount = None
+
+
 	def runAction(self, action):
 		action = unicode(action)
 
 		if action.startswith( "rows/" ):
 			if action == "rows/count":
-				try:
-					self.rowCount = self.database().connector.getTableRowCount(self.name, self.schemaName())
-					self.rowCount = int(self.rowCount) if self.rowCount != None else None
-				except DbError:
-					self.rowCount = "Unknown"
+				self.refreshRowCount()
 				return True
 
 		elif action.startswith( "triggers/" ):
@@ -388,7 +399,7 @@ class Table(DbItemObject):
 		uri.setDataSource(schema, self.name, self.geomColumn)
 		return uri
 
-	def getMapLayer(self):
+	def toMapLayer(self):
 		from qgis.core import QgsVectorLayer
 		provider = self.database().dbplugin().providerName()
 		return QgsVectorLayer(self.uri().uri(), self.name, provider)

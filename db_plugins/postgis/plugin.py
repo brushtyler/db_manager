@@ -103,6 +103,11 @@ class PGDatabase(Database):
 		return PGSchema(row, db)
 
 
+	def sqlDataModel(self, sql, parent):
+		from .data_model import PGSqlModel
+		return PGSqlModel(self, sql, parent)
+
+
 class PGSchema(Schema):
 	def __init__(self, row, db):
 		Schema.__init__(self, db)
@@ -164,6 +169,11 @@ class PGTable(Table):
 	def info(self):
 		from .info_model import PGTableInfo
 		return PGTableInfo(self)
+
+	def dataModel(self, parent):
+		from .data_model import PGTableModel
+		return PGTableModel(self, parent)
+
 
 	def getValidUniqueFields(self, onlyOne=False):
 		""" list of fields valid to load the table as layer in qgis canvas """

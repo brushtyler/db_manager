@@ -23,7 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..connector import DBConnector, SqlTableModel
+from ..connector import DBConnector
 from ..plugin import ConnectionError, DbError
 
 from pyspatialite import dbapi2 as sqlite
@@ -269,7 +269,7 @@ class SpatiaLiteDBConnector(DBConnector):
 	def _exec_sql(self, cursor, sql):
 		try:
 			cursor.execute(unicode(sql))
-		except sqlite.Error, e:
+		except sqlite.OperationalError, e:
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self.connection.rollback()
 			raise DbError(e, sql)
@@ -280,33 +280,18 @@ class SpatiaLiteDBConnector(DBConnector):
 		self._exec_sql(c, sql)
 		self.connection.commit()
 
+	def _get_cursor(self, name=None):
+		if name:
+			name = unicode(name).encode('ascii', 'replace', '_')
+			self._last_cursor_named_id = 0 if not hasattr(self, '_last_cursor_named_id') else self._last_cursor_named_id + 1
+			return self.connection.cursor( "%s_%d" % (name, self._last_cursor_named_id) )
+		return self.connection.cursor()
 
-	def getSqlTableModel(self, sql, parent):
+	def _fetchall(self, c):
 		try:
-			c = self.connection.cursor()
-			t = QTime()
-			t.start()
-			self._exec_sql(c, sql)
-			secs = t.elapsed() / 1000.0
-			model = SLSqlTableModel(c, parent)
-			rowcount = c.rowcount
-			
-			# commit before closing the cursor to make sure that the changes are stored
-			self.connection.commit()
-			c.close()
-		except:
-			raise
-		return (model, secs, rowcount)
-
-
-class SLSqlTableModel(SqlTableModel):	
-	def __init__(self, cursor, parent=None):
-		SqlTableModel.__init__(self, parent)
-		try:
-			resdata = cursor.fetchall()
-			if cursor.description != None:
-				self.header = map(lambda x: x[0], cursor.description)
-				self.resdata = resdata
+			return c.fetchall()
 		except sqlite.OperationalError, e:
-			pass # nothing to fetch!
+			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
+			self.connection.rollback()
+			raise DbError(e)
 

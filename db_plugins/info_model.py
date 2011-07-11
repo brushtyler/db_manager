@@ -180,11 +180,11 @@ class TableInfo:
 
 	def generalInfo(self):
 		if self.table.rowCount == None:
-			self.table.runAction("rows/count")
+			self.table.refreshRowCount()
 
 		tbl = [
 			("Relation type:", "View" if self.table.isView else "Table"), 
-			("Rows:", self.table.rowCount) 
+			("Rows:", self.table.rowCount if self.table.rowCount != None else "Unknown") 
 		]
 		return HtmlTable( tbl )
 

@@ -51,6 +51,7 @@ class InfoViewer(QTextBrowser):
 	def showInfo(self, item, force=False):
 		if item == self.item and not force: 
 			return
+		self._clear()
 
 		self.item = item
 		if isinstance(item, DBPlugin):
@@ -59,8 +60,6 @@ class InfoViewer(QTextBrowser):
 			self._showSchemaInfo(item)
 		elif isinstance(item, Table):
 			self._showTableInfo(item)
-		else:
-			self._clear()
 
 	def _clear(self):
 		self.item = None

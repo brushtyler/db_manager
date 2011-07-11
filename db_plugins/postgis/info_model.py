@@ -36,7 +36,7 @@ class PGTableInfo(TableInfo):
 
 		# if the estimation is less than 100 rows, try to count them - it shouldn't take long time
 		if self.table.rowCount == None and self.table.estimatedRowCount < 100:
-			self.table.runAction("rows/count")
+			self.table.refreshRowCount()
 
 		tbl = [
 			("Relation type:", "View" if self.table.isView else "Table"), 

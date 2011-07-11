@@ -23,10 +23,13 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..connector import DBConnector, SqlTableModel
+from ..connector import DBConnector
 from ..plugin import ConnectionError, DbError
 
 import psycopg2
+
+def classFactory():
+	return PostGisDBConnector
 
 class PostGisDBConnector(DBConnector):
 	def __init__(self, uri):
@@ -488,31 +491,18 @@ class PostGisDBConnector(DBConnector):
 		self._exec_sql(c, sql)
 		self.connection.commit()
 
-	def getSqlTableModel(self, sql, parent):
-		try:
-			c = self.connection.cursor()
-			t = QTime()
-			t.start()
-			self._exec_sql(c, sql)
-			secs = t.elapsed() / 1000.0
-			model = PGSqlTableModel(c, parent)
-			rowcount = c.rowcount
-			
-			# commit before closing the cursor to make sure that the changes are stored
-			self.connection.commit()
-			c.close()
-		except:
-			raise
-		return (model, secs, rowcount)
+	def _get_cursor(self, name=None):
+		if name:
+			name = QString( unicode(name).encode('ascii', 'replace') ).replace( QRegExp("\W"), "_" ).toAscii()
+			self._last_cursor_named_id = 0 if not hasattr(self, '_last_cursor_named_id') else self._last_cursor_named_id + 1
+			return self.connection.cursor( "%s_%d" % (name, self._last_cursor_named_id) )
+		return self.connection.cursor()
 
-
-class PGSqlTableModel(SqlTableModel):
-	def __init__(self, cursor, parent=None):
-		SqlTableModel.__init__(self, parent)
+	def _fetchall(self, c):
 		try:
-			resdata = cursor.fetchall()
-			self.header = map(lambda x: x[0], cursor.description)
-			self.resdata = resdata
+			return c.fetchall()
 		except psycopg2.Error, e:
-			pass # nothing to fetch!
+			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
+			self.connection.rollback()
+			raise DbError(e)
 
