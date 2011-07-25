@@ -25,7 +25,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from .db_plugins import supportedDbTypes, createDbPlugin
-from .db_plugins.plugin import InvalidDataException, ConnectionError
+from .db_plugins.plugin import InvalidDataException, ConnectionError, Table
 
 try:
 	from . import resources_rc
@@ -41,15 +41,25 @@ class TreeItem(QObject):
 		if parent: 
 			parent.appendChild(self)
 
+	def childRemoved(self, child):
+		self.itemChanged()	
+
+	def itemChanged(self):
+		self.emit( SIGNAL("itemChanged"), self )
+
+	def itemRemoved(self):
+		self.emit( SIGNAL("itemRemoved"), self )
+
 	def populate(self):
 		self.populated = True
 		return True
 
 	def getItemData(self):
 		return self.itemData
-			
+
 	def appendChild(self, child):
 		self.childItems.append(child)
+		self.connect(child, SIGNAL("itemRemoved"), self.childRemoved)
 	
 	def child(self, row):
 		return self.childItems[row]
@@ -57,6 +67,7 @@ class TreeItem(QObject):
 	def removeChild(self, row):
 		if row >= 0 and row < len(self.childItems):
 			self.childItems[row].itemData.deleteLater()
+			self.disconnect(self.childItems[row], SIGNAL("itemRemoved"), self.childRemoved)
 			del self.childItems[row]
 	
 	def childCount(self):
@@ -82,7 +93,6 @@ class TreeItem(QObject):
 class PluginItem(TreeItem):
 	def __init__(self, dbplugin, parent=None):
 		TreeItem.__init__(self, dbplugin, parent)
-		self.populate()
 
 	def populate(self):
 		if self.populated:
@@ -140,14 +150,17 @@ class ConnectionItem(TreeItem):
 			for t in tables:
 				TableItem(t, self)
 
-		self.populated = True
 		QApplication.restoreOverrideCursor()
+		self.populated = True
 		return True
+
 
 
 class SchemaItem(TreeItem):
 	def __init__(self, schema, parent):
 		TreeItem.__init__(self, schema, parent)
+		self.connect(schema, SIGNAL("changed"), self.itemChanged)
+		self.connect(schema, SIGNAL("deleted"), self.itemRemoved)
 
 		# load (shared) icon with first instance of schema item
 		if not hasattr(SchemaItem, 'schemaIcon'):
@@ -177,6 +190,8 @@ class SchemaItem(TreeItem):
 class TableItem(TreeItem):
 	def __init__(self, table, parent):
 		TreeItem.__init__(self, table, parent)
+		self.connect(table, SIGNAL("changed"), self.itemChanged)
+		self.connect(table, SIGNAL("deleted"), self.itemRemoved)
 		self.populate()
 		
 		# load (shared) icon with first instance of table item
@@ -192,19 +207,24 @@ class TableItem(TreeItem):
 		if column == 0:
 			return self.getItemData().name
 		elif column == 1:
-			return self.getItemData().geomType
+			if self.getItemData().type == Table.VectorType:
+				return self.getItemData().geomType
 		return None
 		
 	def icon(self):
-		geom_type = self.getItemData().geomType
-		if geom_type is not None:
-			if geom_type.find('POINT') != -1:
-				return self.layerPointIcon
-			elif geom_type.find('LINESTRING') != -1:
-				return self.layerLineIcon
-			elif geom_type.find('POLYGON') != -1:
-				return self.layerPolygonIcon
-			return self.layerUnknownIcon
+		if self.getItemData().type == Table.VectorType:
+			geom_type = self.getItemData().geomType
+			if geom_type is not None:
+				if geom_type.find('POINT') != -1:
+					return self.layerPointIcon
+				elif geom_type.find('LINESTRING') != -1:
+					return self.layerLineIcon
+				elif geom_type.find('POLYGON') != -1:
+					return self.layerPolygonIcon
+				return self.layerUnknownIcon
+
+		#elif self.getItemData().type == Table.RasterType:
+		#	pass
 
 		if self.getItemData().isView:
 			return self.viewIcon
@@ -222,16 +242,14 @@ class DBModel(QAbstractItemModel):
 			PluginItem( dbpluginclass, self.rootItem )
 
 
-	def refreshItem(self, item, removed=False):
+	def refreshItem(self, item):
+		self.refreshItemFromData( item.getItemData() )
+
+	def refreshItemFromData(self, data):
 		# find the index for the item
-		index = self._rItem2Index( self._createPathForItem(item) )
+		index = self._rItem2Index( self._createPathForItem(data) )
 		if index.isValid():
-			if removed:
-				# remove child
-				self.removeRows(index.row(), 1, index.parent())
-				self._onDataChanged(index.parent())
-			else:
-				self.refreshIndex(index)
+			self.refreshIndex(index)
 
 	def _createPathForItem(self, item):
 		path = []
@@ -331,8 +349,13 @@ class DBModel(QAbstractItemModel):
 
 	def rowCount(self, parent):
 		parentItem = parent.internalPointer() if parent.isValid() else self.rootItem
-		if not parentItem.populated and parentItem.populate():
-			self._onDataChanged( parent )
+		if not parentItem.populated:
+			if parentItem.populate():
+				for child in parentItem.childItems:
+					self.connect(child, SIGNAL("itemChanged"), self.refreshItem)
+				self._onDataChanged( parent )
+			else:
+				self.emit( SIGNAL("notPopulated"), parent )
 		return parentItem.childCount()
 
 	def hasChildren(self, parent):
@@ -370,6 +393,7 @@ class DBModel(QAbstractItemModel):
 
 	def refreshIndex(self, index):
 		self.removeRows(0, self.rowCount(index), index)
+		print ">>>", index.row()
 		index.internalPointer().populated = False
 		if index.internalPointer().populate():
 			self._onDataChanged(index)		

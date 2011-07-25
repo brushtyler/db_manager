@@ -74,7 +74,10 @@ class DBPlugin(QObject):
 		from .info_model import DatabaseInfo
 		return DatabaseInfo(None)
 
-	def connect(self):
+	def connect(self, uri):
+		self.db = self.databasesFactory( self, uri )
+		if self.db: 
+			return True
 		return False
 
 	@classmethod
@@ -194,11 +197,23 @@ class Database(DbItemObject):
 		res = QMessageBox.question(parent, "hey!", u"Really delete schema %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
 		if res != QMessageBox.Yes:
 			return
-		self.connector.deleteSchema(item.name)
-		self.emit( SIGNAL('contentRemoved'), item )
-
+		item.delete()
 
 	def tablesFactory(self, row, db, schema=None):
+		typ, row = row[0], row[1:]
+		if typ == Table.VectorType:
+			return self.vectorTablesFactory(row, db, schema)
+		elif typ == Table.RasterType:
+			return self.rasterTablesFactory(row, db, schema)
+		return self.dataTablesFactory(row, db, schema)
+
+	def dataTablesFactory(self, row, db, schema=None):
+		return None
+
+	def vectorTablesFactory(self, row, db, schema=None):
+		return None
+
+	def rasterTablesFactory(self, row, db, schema=None):
 		return None
 
 	def tables(self, schema=None):
@@ -209,25 +224,24 @@ class Database(DbItemObject):
 
 	def deleteTable(self, item, action, parent):
 		if not isinstance(item, Table):
-			QMessageBox.information(parent, "Sorry", "Select a TABLE for deletion.")
+			QMessageBox.information(parent, "Sorry", "Select a TABLE/VIEW for deletion.")
 			return
 		res = QMessageBox.question(parent, "hey!", u"Really delete table/view %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
 		if res != QMessageBox.Yes:
 			return
-		self.connector.deleteTable(item.name, item.schemaName())
-		self.emit( SIGNAL('contentRemoved'), item )
+		item.delete()
 
 	def emptyTable(self, item, action, parent):
-		if not isinstance(item, Table):
+		if not isinstance(item, Table) or item.isView:
 			QMessageBox.information(parent, "Sorry", "Select a TABLE to empty it.")
-			return False
+			return
 		res = QMessageBox.question(parent, "hey!", u"Really delete all items from table %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
 		if res != QMessageBox.Yes:
-			return False
+			return
 		self.connector.emptyTable(item.name, item.schemaName())
 		item.refreshRowCount()
-		self.emit( SIGNAL('contentChanged'), item )
-		return True
+		item.emit( SIGNAL('changed') )
+		return
 
 
 class Schema(DbItemObject):
@@ -238,7 +252,6 @@ class Schema(DbItemObject):
 
 	def __del__(self):
 		print "Schema.__del__", self
-		#self.connector = None
 
 	def database(self):
 		return self.parent()
@@ -246,6 +259,9 @@ class Schema(DbItemObject):
 	def tables(self):
 		return self.parent().tables(self)
 
+	def delete(self):
+		self.database().connector.deleteSchema(self.name)
+		self.emit( SIGNAL('deleted') )
 
 	def info(self):
 		from .info_model import SchemaInfo
@@ -253,10 +269,16 @@ class Schema(DbItemObject):
 
 
 class Table(DbItemObject):
+	TableType, VectorType, RasterType = range(3)
+
 	def __init__(self, db, schema=None, parent=None):
 		DbItemObject.__init__(self, db)
 		self._schema = schema
-		self.name = self.isView = self.owner = self.pages = self.geomColumn = self.geomType = self.geomDim = self.srid = None
+		if hasattr(self, 'type'):
+			return
+		self.type = Table.TableType
+
+		self.name = self.isView = self.owner = self.pages = None
 		self.rowCount = None
 
 		self._fields = self._indexes = self._constraints = self._triggers = self._rules = None
@@ -275,6 +297,13 @@ class Table(DbItemObject):
 
 	def quotedName(self):
 		return self.database().connector.quoteId( (self.schemaName(), self.name) )
+
+	def delete(self):
+		if self.isView:
+			self.database().connector.deleteView(self.name, self.schemaName())
+		else:
+			self.database().connector.deleteTable(self.name, self.schemaName())
+		self.emit( SIGNAL('deleted') )
 
 
 	def info(self):
@@ -392,6 +421,14 @@ class Table(DbItemObject):
 
 		return False
 
+class VectorTable(Table):
+	def __init__(self, db, schema=None, parent=None):
+		self.type = Table.VectorType
+		self.geomColumn = self.geomType = self.geomDim = self.srid = None
+
+	def info(self):
+		from .info_model import VectorTableInfo
+		return VectorTableInfo(self)
 
 	def uri(self):
 		uri = self.database().uri()
@@ -404,8 +441,7 @@ class Table(DbItemObject):
 		provider = self.database().dbplugin().providerName()
 		return QgsVectorLayer(self.uri().uri(), self.name, provider)
 
-
-	def getValidUniqueFields(self, onlyOne=False):
+	def getValidQGisUniqueFields(self, onlyOne=False):
 		""" list of fields valid to load the table as layer in qgis canvas """
 		ret = []
 
@@ -425,6 +461,7 @@ class Table(DbItemObject):
 		if onlyOne:
 			return ret if len(ret) > 0 else None
 		return ret
+
 
 
 class TableSubItemObject(QObject):

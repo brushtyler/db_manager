@@ -21,10 +21,10 @@ email                : brush.tyler@gmail.com
 """
 
 def name():
-	return "DB manager"
+	return "DB Manager"
 
 def description():
-	return "Manage your databases"
+	return "Manage your databases within QGis"
 
 def version():
 	return "0.0.1"

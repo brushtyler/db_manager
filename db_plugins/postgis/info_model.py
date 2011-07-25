@@ -23,7 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..info_model import TableInfo
+from ..info_model import TableInfo, VectorTableInfo
 from ..html_elems import HtmlSection, HtmlParagraph, HtmlList, HtmlTable, HtmlTableHeader, HtmlTableCol
 
 class PGTableInfo(TableInfo):
@@ -45,20 +45,22 @@ class PGTableInfo(TableInfo):
 			("Rows (estimation):", self.table.estimatedRowCount )
 		]
 
-		if self.table.rowCount == None or (isinstance(self.table.rowCount, int) and self.table.rowCount >= 0):
-			tbl.append( ("Rows (counted):", self.table.rowCount if self.table.rowCount != None else 'Unknown (<a href="action:rows/count">find out</a>)') )
-
 		# privileges
 		# has the user access to this schema?
 		schema_priv = self.table.database().connector.getSchemaPrivileges(self.table.schema().name) if self.table.schema() else None
 		if schema_priv == None:
 			pass
-		elif reduce(lambda x,y: x or y, schema_priv) == False:	# no privileges on the schema
+		elif schema_priv[1] == False:	# no usage privileges on the schema
 			tbl.append( ("Privileges:", u"<warning> This user doesn't have usage privileges for this schema!" ) )
 		else:
 			table_priv = self.table.database().connector.getTablePrivileges(self.table.name, self.table.schema().name if self.table.schema() else None)
 			privileges = []
-			if table_priv[0]: privileges.append("select")
+			if table_priv[0]:
+				privileges.append("select")
+
+				if self.table.rowCount == None or (isinstance(self.table.rowCount, int) and self.table.rowCount >= 0):
+					tbl.append( ("Rows (counted):", self.table.rowCount if self.table.rowCount != None else 'Unknown (<a href="action:rows/count">find out</a>)') )
+
 			if table_priv[1]: privileges.append("insert")
 			if table_priv[2]: privileges.append("update")
 			if table_priv[3]: privileges.append("delete")
@@ -161,4 +163,12 @@ class PGTableInfo(TableInfo):
 			ret.append( HtmlSection( 'Rules', rules_details ) )
 
 		return ret
+
+class PGVectorTableInfo(PGTableInfo, VectorTableInfo):
+	def __init__(self, table):
+		VectorTableInfo.__init__(self, table)
+		PGTableInfo.__init__(self, table)
+
+	def spatialInfo(self):
+		return VectorTableInfo.spatialInfo(self)
 

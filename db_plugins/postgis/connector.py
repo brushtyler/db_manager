@@ -24,7 +24,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from ..connector import DBConnector
-from ..plugin import ConnectionError, DbError
+from ..plugin import ConnectionError, DbError, Table
 
 import psycopg2
 
@@ -132,17 +132,21 @@ class PostGisDBConnector(DBConnector):
 		return c.fetchall()
 
 	def getTables(self, schema=None):
-		"""
-			get list of tables with schemas, whether user has privileges, whether table has geometry column(s) etc.
-			
-			geometry_columns:
-			- f_table_schema
-			- f_table_name
-			- f_geometry_column
-			- coord_dimension
-			- srid
-			- type
-		"""
+		""" get list of tables """
+		tablenames = []
+		items = []
+
+		vectors = self.getVectorTables(schema)
+		for tbl in vectors:
+			tablenames.append( (tbl[2], tbl[1]) )
+			items.append( tbl )
+
+		#rasters = self.getRasterTables(schema)
+		#for tbl in rasters:
+		#	tablenames.append( (tbl[2], tbl[1]) )
+		#	items.append( tbl )
+
+
 		c = self.connection.cursor()
 		
 		if schema:
@@ -150,42 +154,85 @@ class PostGisDBConnector(DBConnector):
 		else:
 			schema_where = u" AND (nspname != 'information_schema' AND nspname !~ 'pg_') "
 			
-		# LEFT OUTER JOIN: like LEFT JOIN but if there are more matches, for join, all are used (not only one)
-		
-		# first find out whether postgis is enabled
-		if not self.has_spatial:
-			# get all tables and views
-			sql = u"""SELECT pg_class.relname, pg_namespace.nspname, pg_class.relkind = 'v', pg_get_userbyid(relowner), reltuples, relpages, NULL, NULL, NULL, NULL
-							FROM pg_class
-							JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
-							WHERE pg_class.relkind IN ('v', 'r')""" + schema_where + "ORDER BY nspname, relname"
-		else:
-			# discovery of all tables and whether they contain a geometry column
-			sql = u"""SELECT pg_class.relname, pg_namespace.nspname, pg_class.relkind = 'v', pg_get_userbyid(relowner), reltuples, relpages, pg_attribute.attname, pg_attribute.atttypid::regtype, NULL, NULL
-							FROM pg_class
-							JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
-							LEFT OUTER JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid AND
-									( pg_attribute.atttypid = 'geometry'::regtype
-										OR pg_attribute.atttypid IN (SELECT oid FROM pg_type WHERE typbasetype='geometry'::regtype ) )
-							WHERE pg_class.relkind IN ('v', 'r')""" + schema_where + "ORDER BY nspname, relname, attname"
+		# get all tables and views
+		sql = u"""SELECT pg_class.relname, pg_namespace.nspname, pg_class.relkind = 'v', pg_get_userbyid(relowner), reltuples, relpages
+						FROM pg_class
+						JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+						WHERE pg_class.relkind IN ('v', 'r')""" + schema_where + "ORDER BY nspname, relname"
 						  
 		self._exec_sql(c, sql)
-		items = c.fetchall()
+
+		for tbl in c.fetchall():
+			tblname = (tbl[1], tbl[0])
+			if tablenames.count( tblname ) <= 0:
+				item = list(tbl)
+				item.insert(0, Table.TableType)
+				items.append( item )
+
+		return sorted( items, cmp=lambda x,y: cmp((x[2],x[1]), (y[2],y[1])) )
+
+
+	def getVectorTables(self, schema=None):
+		""" get list of table with a geometry column
+			it returns:
+				name (table name)
+				namespace (schema)
+				type = 'view' (is a view?)
+				owner 
+				tuples
+				pages
+				geometry_column:
+					f_geometry_column (or pg_attribute.attname, the geometry column name)
+					type (or pg_attribute.atttypid::regtype::text, the geometry column type name)
+					coord_dimension 
+					srid
+		"""
+
+		if not self.has_spatial:
+			return []
+
+		c = self.connection.cursor()
 		
-		# get geometry info from geometry_columns if exists
-		if self.has_spatial and self.has_geometry_columns and self.has_geometry_columns_access:
-			sql = u"""SELECT relname, nspname, relkind = 'v', pg_get_userbyid(relowner), reltuples, relpages,
-							geometry_columns.f_geometry_column, geometry_columns.type, geometry_columns.coord_dimension, geometry_columns.srid
-							FROM pg_class
-						  JOIN pg_namespace ON relnamespace=pg_namespace.oid
-						  LEFT OUTER JOIN geometry_columns ON relname=f_table_name AND nspname=f_table_schema
-						  WHERE (relkind = 'r' or relkind='v') """ + schema_where + "ORDER BY nspname, relname, f_geometry_column"
-			self._exec_sql(c, sql)
+		if schema:
+			schema_where = u" AND nspname = %s " % self.quoteString(schema)
+		else:
+			schema_where = u" AND (nspname != 'information_schema' AND nspname !~ 'pg_') "
+
+		geometry_column_from = u""
+		if self.has_geometry_columns and self.has_geometry_columns_access:
+			geometry_column_from = u"""LEFT OUTER JOIN geometry_columns AS geo ON 
+						cla.relname = geo.f_table_name AND nsp.nspname = f_table_schema AND 
+						lower(att.attname) = lower(f_geometry_column)"""
 			
-			# merge geometry info to "items"
-			for i, geo_item in enumerate(c.fetchall()):
-				if geo_item[7]:
-					items[i] = geo_item
+
+		# discovery of all tables and whether they contain a geometry column
+		sql = u"""SELECT 
+						cla.relname, nsp.nspname, cla.relkind = 'v', pg_get_userbyid(relowner), cla.reltuples, cla.relpages, 
+						CASE WHEN geo.f_geometry_column IS NOT NULL THEN geo.f_geometry_column ELSE att.attname END, 
+						CASE WHEN geo.type IS NOT NULL THEN geo.type ELSE att.atttypid::regtype::text END, 
+						geo.coord_dimension, geo.srid
+
+					FROM pg_class AS cla 
+					JOIN pg_namespace AS nsp ON 
+						nsp.oid = cla.relnamespace
+
+					JOIN pg_attribute AS att ON 
+						att.attrelid = cla.oid AND 
+						att.atttypid = 'geometry'::regtype OR 
+						att.atttypid IN (SELECT oid FROM pg_type WHERE typbasetype='geometry'::regtype ) 
+
+					""" + geometry_column_from + """ 
+
+					WHERE cla.relkind IN ('v', 'r') """ + schema_where + """ 
+					ORDER BY nsp.nspname, cla.relname, att.attname"""
+
+		self._exec_sql(c, sql)
+
+		items = []
+		for i, tbl in enumerate(c.fetchall()):
+			item = list(tbl)
+			item.insert(0, Table.VectorType)
+			items.append( item )
 			
 		return items
 
@@ -431,7 +478,7 @@ class PostGisDBConnector(DBConnector):
 		self._exec_sql_and_commit(sql)
 	
 	def deleteView(self, name, schema=None):
-		sql = u"DROP VIEW %s" % self.quoteId( (schema, table) )
+		sql = u"DROP VIEW %s" % self.quoteId( (schema, name) )
 		self._exec_sql_and_commit(sql)
 	
 	def renameView(self, name, new_name, schema=None):

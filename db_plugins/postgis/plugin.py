@@ -23,7 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..plugin import DBPlugin, Database, Schema, Table, TableField, TableConstraint, TableIndex, TableTrigger, TableRule
+from ..plugin import DBPlugin, Database, Schema, Table, VectorTable, TableField, TableConstraint, TableIndex, TableTrigger, TableRule
 try:
 	from . import resources_rc
 except ImportError:
@@ -83,8 +83,7 @@ class PostGisDBPlugin(DBPlugin):
 		import qgis.core
 		uri = qgis.core.QgsDataSourceURI()
 		uri.setConnection(host, port, database, username, password)
-		self.db = self.databasesFactory( self, uri )
-		return True
+		return DBPlugin.connect(self, uri)
 
 
 class PGDatabase(Database):
@@ -96,8 +95,11 @@ class PGDatabase(Database):
 		return PostGisDBConnector(uri)
 
 
-	def tablesFactory(self, row, db, schema=None):
+	def dataTablesFactory(self, row, db, schema=None):
 		return PGTable(row, db, schema)
+
+	def vectorTablesFactory(self, row, db, schema=None):
+		return PGVectorTable(row, db, schema)
 
 	def schemasFactory(self, row, db):
 		return PGSchema(row, db)
@@ -118,9 +120,8 @@ class PGSchema(Schema):
 class PGTable(Table):
 	def __init__(self, row, db, schema=None):
 		Table.__init__(self, db, schema)
-		self.name, schema_name, self.isView, self.owner, self.estimatedRowCount, self.pages, self.geomColumn, self.geomType, self.geomDim, self.srid = row
+		self.name, schema_name, self.isView, self.owner, self.estimatedRowCount, self.pages = row
 		self.estimatedRowCount = int(self.estimatedRowCount)
-
 
 	def runVacuumAnalyze(self):
 		self.database().connector.runVacuumAnalyze(self.name, self.schemaName())
@@ -174,6 +175,16 @@ class PGTable(Table):
 		from .data_model import PGTableModel
 		return PGTableModel(self, parent)
 
+
+class PGVectorTable(PGTable, VectorTable):
+	def __init__(self, row, db, schema=None):
+		PGTable.__init__(self, row[:-4], db, schema)
+		VectorTable.__init__(self, db, schema)
+		self.geomColumn, self.geomType, self.geomDim, self.srid = row[-4:]
+
+	def info(self):
+		from .info_model import PGVectorTableInfo
+		return PGVectorTableInfo(self)
 
 	def getValidUniqueFields(self, onlyOne=False):
 		""" list of fields valid to load the table as layer in qgis canvas """

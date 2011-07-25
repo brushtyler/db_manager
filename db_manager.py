@@ -29,7 +29,7 @@ from .layer_preview import LayerPreview
 
 from .db_tree import DBTree
 
-from .db_plugins.plugin import DbError
+from .db_plugins.plugin import DbError, Table
 from .dlg_db_error import DlgDbError
 
 
@@ -65,10 +65,6 @@ class DBManager(QMainWindow):
 		if item == None:
 			item = self.tree.currentItem()
 		self.tree.refreshItem(item)	# refresh item children in the db tree
-		self.info.refresh()	# refresh info about the current selected item
-
-	def removeItem(self, item=None):
-		self.tree.refreshItem(item, True)
 
 
 	def itemChanged(self, item):
@@ -79,21 +75,19 @@ class DBManager(QMainWindow):
 		db = self.tree.currentDatabase()
 		if not hasattr(self, '_lastDb'):
 			self._lastDb = db
+
 		elif db == self._lastDb:
 			return
 
 		# remove old actions
 		if self._lastDb != None:
 			self.unregisterAllActions()
-			self.disconnect( self._lastDb, SIGNAL("contentChanged"), self.refreshItem )
-			self.disconnect( self._lastDb, SIGNAL("contentRemoved"), self.removeItem )
 
 		# add actions of the selected database
 		self._lastDb = db
 		if self._lastDb != None:
 			self._lastDb.registerAllActions(self)
-			self.connect( self._lastDb, SIGNAL("contentChanged"), self.refreshItem )
-			self.connect( self._lastDb, SIGNAL("contentRemoved"), self.removeItem )
+
 
 	def tabChanged(self, index):
 		self.refreshTabs()
@@ -105,7 +99,7 @@ class DBManager(QMainWindow):
 
 		# enable/disable tabs
 		self.tabs.setTabEnabled( self.tabs.indexOf(self.table), table != None )
-		self.tabs.setTabEnabled( self.tabs.indexOf(self.preview), table != None and table.geomColumn != None )
+		self.tabs.setTabEnabled( self.tabs.indexOf(self.preview), table != None and table.type == Table.VectorType and table.geomColumn != None )
 
 		# show the info tab if the current tab is disabled
 		if not self.tabs.isTabEnabled( index ):
@@ -113,7 +107,7 @@ class DBManager(QMainWindow):
 
 		current_tab = self.tabs.currentWidget()
 		if current_tab == self.info:
-			self.info.showInfo( item )
+			self.info.showInfo( item, True ) # force refresh
 		elif current_tab == self.table:
 			self.table.loadData( item )
 		elif current_tab == self.preview:

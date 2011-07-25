@@ -23,7 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..plugin import DBPlugin, Database, Table, TableField, TableConstraint, TableIndex, TableTrigger
+from ..plugin import DBPlugin, Database, Table, VectorTable, TableField, TableConstraint, TableIndex, TableTrigger
 try:
 	from . import resources_rc
 except ImportError:
@@ -73,8 +73,7 @@ class SpatiaLiteDBPlugin(DBPlugin):
 		import qgis.core
 		uri = qgis.core.QgsDataSourceURI()
 		uri.setDatabase(database)
-		self.db = self.databasesFactory( self, uri )
-		return True
+		return DBPlugin.connect(self, uri)
 
 
 class SLDatabase(Database):
@@ -86,11 +85,11 @@ class SLDatabase(Database):
 		return SpatiaLiteDBConnector(uri)
 
 
-	def schemasFactory(self, row, db):
-		return None
-
-	def tablesFactory(self, row, db, schema=None):
+	def dataTablesFactory(self, row, db, schema=None):
 		return SLTable(row, db, schema)
+
+	def vectorTablesFactory(self, row, db, schema=None):
+		return SLVectorTable(row, db, schema)
 
 
 	def info(self):
@@ -105,7 +104,7 @@ class SLDatabase(Database):
 class SLTable(Table):
 	def __init__(self, row, db, schema=None):
 		Table.__init__(self, db, None)
-		self.name, self.isView, self.geomColumn, self.geomType, self.geomDim, self.srid, self.isSysTable = row
+		self.name, self.isView, self.isSysTable = row
 
 
 	def tableFieldsFactory(self, row, table):
@@ -123,15 +122,20 @@ class SLTable(Table):
 		return SLTableModel(self, parent)
 
 
+class SLVectorTable(SLTable, VectorTable):
+	def __init__(self, row, db, schema=None):
+		SLTable.__init__(self, row[:-5], db, schema)
+		VectorTable.__init__(self, db, schema)
+		self.geomTableName, self.geomColumn, self.geomType, self.geomDim, self.srid = row[-5:]
+
 	def uri(self):
 		uri = self.database().uri()
-		uri.setDataSource('', self.name.lower(), self.geomColumn)
+		uri.setDataSource('', self.geomTableName, self.geomColumn)
 		return uri
 
 	def getValidUniqueFields(self, onlyOne=False):
 		""" list of fields valid to load the table as layer in qgis canvas """
 		return [ "ROWID" ] if not onlyOne else "ROWID"
-
 
 
 class SLTableField(TableField):

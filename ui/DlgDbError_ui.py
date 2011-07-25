@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'ui/DlgDbError.ui'
 #
-# Created: Mon Jun 20 20:07:37 2011
+# Created: Tue Jul 12 15:07:04 2011
 #      by: PyQt4 UI code generator 4.8.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -17,7 +17,7 @@ except AttributeError:
 class Ui_DlgDbError(object):
     def setupUi(self, DlgDbError):
         DlgDbError.setObjectName(_fromUtf8("DlgDbError"))
-        DlgDbError.resize(400, 369)
+        DlgDbError.resize(400, 314)
         self.vboxlayout = QtGui.QVBoxLayout(DlgDbError)
         self.vboxlayout.setObjectName(_fromUtf8("vboxlayout"))
         self.label = QtGui.QLabel(DlgDbError)

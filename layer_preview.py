@@ -26,7 +26,7 @@ from PyQt4.QtGui import *
 from qgis.gui import QgsMapCanvas, QgsMapCanvasLayer
 from qgis.core import QgsVectorLayer, QgsMapLayerRegistry
 
-from .db_plugins.plugin import DbError, Table
+from .db_plugins.plugin import DbError, VectorTable
 
 class LayerPreview(QgsMapCanvas):
 	def __init__(self, parent=None):
@@ -53,7 +53,7 @@ class LayerPreview(QgsMapCanvas):
 
 		self._clear()
 		self.item = item
-		if isinstance(item, Table):
+		if isinstance(item, VectorTable):
 			# update the preview, but first let the manager chance to show the canvas
 			runPrev = lambda: self._loadTablePreview( item )
 			QTimer.singleShot(50, runPrev)
@@ -71,9 +71,7 @@ class LayerPreview(QgsMapCanvas):
 		self.setRenderFlag(False)
 		newLayerId = None
 
-		if table == None or table.geomType == None:
-			self.setLayerSet( [] )
-		else:
+		if table.geomType:
 			# limit the query result if required
 			if limit and table.rowCount > 1000:
 				uniqueField = table.getValidUniqueFields(True)

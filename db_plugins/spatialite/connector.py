@@ -24,7 +24,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from ..connector import DBConnector
-from ..plugin import ConnectionError, DbError
+from ..plugin import ConnectionError, DbError, Table
 
 from pyspatialite import dbapi2 as sqlite
 
@@ -36,6 +36,9 @@ class SpatiaLiteDBConnector(DBConnector):
 		DBConnector.__init__(self, uri)
 
 		self.dbname = uri.database()
+		if not QFile.exists( self.dbname ):
+			raise ConnectionError( u'"%s" not found' % self.dbname )
+
 		try:
 			self.connection = sqlite.connect( self._connectionInfo() )
 		except sqlite.OperationalError, e:
@@ -45,7 +48,7 @@ class SpatiaLiteDBConnector(DBConnector):
 		self._checkGeometryColumnsTable()
 
 	def _connectionInfo(self):
-		return '%s' % self.dbname
+		return u'%s' % self.dbname
 	
 	def _checkSpatial(self):
 		""" check if is a valid spatialite db """
@@ -83,21 +86,23 @@ class SpatiaLiteDBConnector(DBConnector):
 		return None
 
 	def getTables(self, schema=None):
-		"""
-			get list of tables, whether table has geometry column(s) etc.
-			
-			geometry_columns:
-			- f_table_name
-			- f_geometry_column
-			- coord_dimension
-			- srid
-			- type
-		"""
+		""" get list of tables """
+		tablenames = []
+		items = []
+
+		vectors = self.getVectorTables(schema)
+		for tbl in vectors:
+			tablenames.append( tbl[1] )
+			items.append( tbl )
+
+		#rasters = self.getRasterTables(schema)
+		#for tbl in rasters:
+		#	tablenames.append( tbl[1] )
+		#	items.append( tbl )
+
 		c = self.connection.cursor()
 
-		items = []
 		sys_tables = ['sqlite_stat1']
-
 		if self.has_geometry_columns:
 			# get the R*Tree tables
 			sql = u"SELECT f_table_name, f_geometry_column FROM geometry_columns WHERE spatial_index_enabled = 1"
@@ -108,21 +113,53 @@ class SpatiaLiteDBConnector(DBConnector):
 				sys_tables.append( 'idx_%s_%s_parent' % idx_item )
 				sys_tables.append( 'idx_%s_%s_rowid' % idx_item )
 
-			# get geometry info from geometry_columns if exists
-			sql = u"""SELECT m.name, m.type = 'view', g.f_geometry_column, g.type, g.coord_dimension, g.srid 
-							FROM sqlite_master AS m LEFT JOIN geometry_columns AS g ON lower(m.name) = lower(g.f_table_name)
-							WHERE m.type in ('table', 'view') 
-							ORDER BY m.name, g.f_geometry_column"""
-		else:
-			sql = u"SELECT name, type = 'view', NULL, NULL, NULL, NULL FROM sqlite_master WHERE type IN ('table', 'view')"
+			
+		sql = u"SELECT name, type = 'view' FROM sqlite_master WHERE type IN ('table', 'view')"
+		self._exec_sql(c, sql)
+
+		for tbl in c.fetchall():
+			if tablenames.count( tbl[0] ) <= 0:
+				item = list(tbl)
+				item.insert(0, Table.TableType)
+				items.append( item )
+
+		for tbl in items:
+			tbl.insert(3, tbl[1] in sys_tables)
+
+		return sorted( items, cmp=lambda x,y: cmp(x[1], y[1]) )
+
+	def getVectorTables(self, schema=None):
+		""" get list of table with a geometry column
+			it returns:
+				name (table name)
+				type = 'view' (is a view?)
+				geometry_column:
+					f_table_name (the table name in geometry_columns may be in a wrong case, use this to load the layer)
+					f_geometry_column
+					type 
+					coord_dimension 
+					srid
+		"""
+					
+		if not self.has_geometry_columns:
+			return []
+
+		c = self.connection.cursor()
+			
+		# get geometry info from geometry_columns if exists
+		sql = u"""SELECT m.name, m.type = 'view', g.f_table_name, g.f_geometry_column, g.type, g.coord_dimension, g.srid 
+						FROM sqlite_master AS m JOIN geometry_columns AS g ON lower(m.name) = lower(g.f_table_name)
+						WHERE m.type in ('table', 'view') 
+						ORDER BY m.name, g.f_geometry_column"""
 
 		self._exec_sql(c, sql)
 
-		for geo_item in c.fetchall():
-			item = list(geo_item)
-			item.append( item[0] in sys_tables )
+		items = []
+		for tbl in c.fetchall():
+			item = list(tbl)
+			item.insert(0, Table.VectorType)
 			items.append( item )
-			
+
 		return items
 
 
