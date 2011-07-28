@@ -23,7 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..plugin import DBPlugin, Database, Schema, Table, VectorTable, TableField, TableConstraint, TableIndex, TableTrigger, TableRule
+from ..plugin import DBPlugin, Database, Schema, Table, VectorTable, RasterTable, TableField, TableConstraint, TableIndex, TableTrigger, TableRule
 try:
 	from . import resources_rc
 except ImportError:
@@ -100,6 +100,9 @@ class PGDatabase(Database):
 
 	def vectorTablesFactory(self, row, db, schema=None):
 		return PGVectorTable(row, db, schema)
+
+	def rasterTablesFactory(self, row, db, schema=None):
+		return PGRasterTable(row, db, schema)
 
 	def schemasFactory(self, row, db):
 		return PGSchema(row, db)
@@ -189,7 +192,6 @@ class PGVectorTable(PGTable, VectorTable):
 	def getValidUniqueFields(self, onlyOne=False):
 		""" list of fields valid to load the table as layer in qgis canvas """
 		ret = Table.getUniqueFieldsForLayer(self)
-
 		# add both serial and int4 fields with an unique index
 		indexes = self.indexes()
 		if indexes != None:
@@ -203,6 +205,41 @@ class PGVectorTable(PGTable, VectorTable):
 			return ret if len(ret) > 0 else None
 		return ret
 
+class PGRasterTable(PGTable, RasterTable):
+	def __init__(self, row, db, schema=None):
+		PGTable.__init__(self, row[:-6], db, schema)
+		RasterTable.__init__(self, db, schema)
+		self.geomColumn, self.pixelType, self.pixelSizeX, self.pixelSizeY, self.isExternal, self.srid = row[-6:]
+		self.geomType='RASTER'
+
+	def info(self):
+		from .info_model import PGRasterTableInfo
+		return PGRasterTableInfo(self)
+
+	def getValidUniqueFields(self, onlyOne=False):
+		""" list of fields valid to load the table as layer in qgis canvas """
+		ret = Table.getUniqueFieldsForLayer(self)
+		# add both serial and int4 fields with an unique index
+		indexes = self.indexes()
+		if indexes != None:
+			for idx in indexes:
+				if idx.isUnique and len(idx.columns) == 1:
+					fld = idx.fields()[0]
+					if fld and fld not in ret and fld.type in ["oid", "serial", "int4"]:
+						ret.append( fld )
+
+		if onlyOne:
+			return ret if len(ret) > 0 else None
+		return ret
+	
+	def toMapLayer(self):
+		from qgis.core import QgsRasterLayer 
+		uri=self.uri()
+		schema = "schema="+self.schemaName() if self.schemaName() else ''
+		pgrasterUri= ('PG: dbname=%s host=%s user=%s password=%s port=%s mode=2 %s table=%s') % (uri.database(), uri.host(), uri.username(), uri.password(), uri.port(),schema,self.name)
+		rasterLayer=QgsRasterLayer(pgrasterUri, self.name)
+		rasterLayer.setContrastEnhancementAlgorithm("StretchToMinimumMaximum")
+		return rasterLayer
 
 class PGTableField(TableField):
 	def __init__(self, row, table):

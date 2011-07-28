@@ -402,3 +402,53 @@ class VectorTableInfo(TableInfo):
 
 		return ret
 
+class RasterTableInfo(TableInfo):
+	def __init__(self, table):
+		TableInfo.__init__(self, table)
+
+	def spatialInfo(self):
+		ret = []
+		if self.table.geomType == None:
+			return ret
+
+		tbl = [
+			("Column:", self.table.geomColumn),
+			("Geometry:", self.table.geomType)
+		]
+
+		# only if we have info from geometry_columns
+		if (self.table.srid):
+			sr_info = self.table.database().connector.getSpatialRefInfo(self.table.srid) if self.table.srid != -1 else "Undefined"
+			if sr_info:
+				tbl.append( ("Spatial ref:", u"%s (%d)" % (sr_info, self.table.srid)) )
+
+		# estimated extent
+		if not self.table.isView:
+			extent = self.table.database().connector.getTableEstimatedExtent("st_convexhull("+self.table.geomColumn+")", self.table.name, self.table.schema().name if self.table.schema() else None)
+			if extent != None and extent[0] != None:
+				extent = '%.5f, %.5f - %.5f, %.5f' % extent
+			else:
+				extent = '(unknown)'
+			tbl.append( ("Extent:", extent) )
+
+		ret.append( HtmlTable( tbl ) )
+
+		# is there an entry in geometry_columns?
+		if self.table.geomType.lower() == 'geometry':
+			ret.append( HtmlParagraph( u"<warning> There isn't entry in geometry_columns!" ) )
+
+		# find out whether the geometry column has spatial index on it
+		if not self.table.isView:
+			has_spatial_index = False
+			for fld in self.table.fields():
+				if fld.name == self.table.geomColumn:
+					for idx in self.table.indexes():
+						if fld.num in idx.columns:
+							has_spatial_index = True
+							break
+					break
+
+			if not has_spatial_index:
+				ret.append( HtmlParagraph( u'<warning> No spatial index defined.' ) )
+
+		return ret

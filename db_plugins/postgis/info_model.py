@@ -23,7 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..info_model import TableInfo, VectorTableInfo
+from ..info_model import TableInfo, VectorTableInfo, RasterTableInfo
 from ..html_elems import HtmlSection, HtmlParagraph, HtmlList, HtmlTable, HtmlTableHeader, HtmlTableCol
 
 class PGTableInfo(TableInfo):
@@ -172,3 +172,10 @@ class PGVectorTableInfo(PGTableInfo, VectorTableInfo):
 	def spatialInfo(self):
 		return VectorTableInfo.spatialInfo(self)
 
+class PGRasterTableInfo(PGTableInfo, RasterTableInfo):
+	def __init__(self, table):
+		RasterTableInfo.__init__(self, table)
+		PGTableInfo.__init__(self, table)
+
+	def spatialInfo(self):
+		return RasterTableInfo.spatialInfo(self)

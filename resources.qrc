@@ -3,6 +3,7 @@
         <file>icons/layer_line.png</file>
         <file>icons/layer_point.png</file>
         <file>icons/layer_polygon.png</file>
+        <file>icons/layer_raster.png</file>
         <file>icons/layer_unknown.png</file>
         <file>icons/namespace.png</file>
         <file>icons/namespaces.xpm</file>

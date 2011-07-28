@@ -50,6 +50,8 @@ class PGTableModel(DbTableModel):
 		if field.dataType.lower() == "geometry":
 			#TODO use ST_GeometryType instead
 			return u'GeometryType(%s)' % self.db.quoteId(field.name)
+		elif field.dataType.lower() == "raster":
+			return '\'RASTER\''
 		return self.db.quoteId(field.name)
 
 
