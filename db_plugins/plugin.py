@@ -310,6 +310,18 @@ class Table(DbItemObject):
 		from .info_model import TableInfo
 		return TableInfo(self)
 
+	def uri(self):
+		uri = self.database().uri()
+		schema = self.schemaName() if self.schemaName() else ''
+		geomCol = self.geomColumn if self.type == Table.VectorType else QString()
+		uri.setDataSource(schema, self.name, geomCol)
+		return uri
+
+	def toMapLayer(self):
+		from qgis.core import QgsVectorLayer
+		provider = self.database().dbplugin().providerName()
+		return QgsVectorLayer(self.uri().uri(), self.name, provider)
+
 	def dataModel(self, parent):
 		pass
 
@@ -429,17 +441,6 @@ class VectorTable(Table):
 	def info(self):
 		from .info_model import VectorTableInfo
 		return VectorTableInfo(self)
-
-	def uri(self):
-		uri = self.database().uri()
-		schema = self.schemaName() if self.schemaName() else ''
-		uri.setDataSource(schema, self.name, self.geomColumn)
-		return uri
-
-	def toMapLayer(self):
-		from qgis.core import QgsVectorLayer
-		provider = self.database().dbplugin().providerName()
-		return QgsVectorLayer(self.uri().uri(), self.name, provider)
 
 	def getValidQGisUniqueFields(self, onlyOne=False):
 		""" list of fields valid to load the table as layer in qgis canvas """

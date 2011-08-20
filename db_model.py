@@ -27,6 +27,8 @@ from PyQt4.QtGui import *
 from .db_plugins import supportedDbTypes, createDbPlugin
 from .db_plugins.plugin import InvalidDataException, ConnectionError, Table
 
+from qgis.core import QgsProviderRegistry
+
 try:
 	from . import resources_rc
 except ImportError:
@@ -89,6 +91,11 @@ class TreeItem(QObject):
 	def icon(self):
 		return None
 
+	def path(self):
+		pathList = QStringList()
+		if self.parent(): pathList << self.parent().path()
+		return pathList << self.data(0)
+
 
 class PluginItem(TreeItem):
 	def __init__(self, dbplugin, parent=None):
@@ -114,6 +121,9 @@ class PluginItem(TreeItem):
 
 	def icon(self):
 		return self.getItemData().icon()
+
+	def path(self):
+		return QStringList() << self.data(0)
 
 
 class ConnectionItem(TreeItem):
@@ -153,7 +163,6 @@ class ConnectionItem(TreeItem):
 		QApplication.restoreOverrideCursor()
 		self.populated = True
 		return True
-
 
 
 class SchemaItem(TreeItem):
@@ -230,11 +239,25 @@ class TableItem(TreeItem):
 			return self.viewIcon
 		return self.tableIcon
 
+	def path(self):
+		pathList = QStringList()
+		if self.parent(): pathList << self.parent().path()
+
+		if self.getItemData().type == Table.VectorType:
+			pathList << "%s::%s" % ( self.data(0), self.getItemData().geomColumn )
+		else:
+			pathList << self.data(0)
+
+		return pathList
+
 
 class DBModel(QAbstractItemModel):
 	def __init__(self, parent=None):
 		QAbstractItemModel.__init__(self, parent)
 		self.header = ['Databases']
+
+		self.isImportVectorAvail = hasattr(QgsProviderRegistry.instance(), 'importVector')
+		self.connect(self, SIGNAL("importVector"), self.importVector)
 
 		self.rootItem = TreeItem(None, None)
 		for dbtype in supportedDbTypes():
@@ -243,52 +266,52 @@ class DBModel(QAbstractItemModel):
 
 
 	def refreshItem(self, item):
-		self.refreshItemFromData( item.getItemData() )
-
-	def refreshItemFromData(self, data):
-		# find the index for the item
-		index = self._rItem2Index( self._createPathForItem(data) )
-		if index.isValid():
-			self.refreshIndex(index)
-
-	def _createPathForItem(self, item):
-		path = []
-		if item == None:
-			return path
-		try:
-			if item.database() != None:
-				path.append( createDbPlugin(item.database().connection().typeName()) )
-		except TypeError:
-			path.append( item )	# it's a DBPlugin class object, no database
+		if isinstance(item, TreeItem):
+			# find the index for the tree item using the path
+			index = self._rPath2Index( item.path() )
 		else:
-			from .db_plugins.plugin import DBPlugin, Schema, Table
-			if isinstance(item, Table):
-				if item.schema() != None:
-					path.extend( [item.database().connection(), item.schema(), item] )
-				else:
-					path.extend( [item.database().connection(), item] )
-			elif isinstance(item, Schema):
-				path.extend( [item.database().connection(), item] )
-			else:
-				path.append( item )
-		return path
+			# find the index for the db item
+			index = self._rItem2Index(item)
+		if index.isValid():
+			self._refreshIndex(index)
 
 	def _rItem2Index(self, item, parent=None):
 		if parent == None:
 			parent = QModelIndex()
-		if item == None or len(item) == 0:
+		if item == self.getItem(parent):
 			return parent
-		for i in range( self.rowCount(parent) ):
-			index = self.index(i, 0, parent)
-			if self.getItem( index ) == item[0]:
-				return self._rItem2Index( item[1:], index )
+
+		if not parent.isValid() or parent.internalPointer().populated:
+			for i in range( self.rowCount(parent) ):
+				index = self.index(i, 0, parent)
+				index = self._rItem2Index(item, index)
+				if index.isValid():
+					return index
+
 		return QModelIndex()
 
+	def _rPath2Index(self, path, parent=None, n=0):
+		if parent == None:
+			parent = QModelIndex()
+		if path == None or len(path) == 0:
+			return parent
+
+		for i in range( self.rowCount(parent) ):
+			index = self.index(i, 0, parent)
+			if self._getPath(index)[n] == path[0]:
+				return self._rPath2Index( path[1:], index, n+1 )
+
+		return QModelIndex()
 
 	def getItem(self, index):
 		if not index.isValid():
 			return None
 		return index.internalPointer().getItemData() 
+
+	def _getPath(self, index):
+		if not index.isValid():
+			return None
+		return index.internalPointer().path() 
 
 
 	def columnCount(self, parent):
@@ -310,13 +333,25 @@ class DBModel(QAbstractItemModel):
 	
 	def flags(self, index):
 		if not index.isValid():
-			return 0
-		
-		flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable 
+			return Qt.NoItemFlags
+
+		flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+
 		if index.column() == 0:
 			item = index.internalPointer()
 			if isinstance(item, SchemaItem) or isinstance(item, TableItem):
 				flags |= Qt.ItemIsEditable
+
+			if self.isImportVectorAvail:	# allow to import a vector layer
+				if isinstance(item, ConnectionItem) and item.populated:
+					flags |= Qt.ItemIsDropEnabled
+
+				if isinstance(item, SchemaItem) or isinstance(item, TableItem):
+					flags |= Qt.ItemIsDropEnabled
+
+				if isinstance(item, TableItem):
+					flags |= Qt.ItemIsDragEnabled
+
 		return flags
 	
 	def headerData(self, section, orientation, role):
@@ -368,14 +403,17 @@ class DBModel(QAbstractItemModel):
 			return False
 			
 		item = index.internalPointer()
-		new_name = unicode(value.toString())
-		if new_name == item.name:
-			return False
+		new_value = unicode(value.toString())
 		
 		if isinstance(item, SchemaItem) or isinstance(item, TableItem):
+			obj = item.getItemData()
+
 			# rename schema or table or view
+			if new_value == obj.name:
+				return False
+
 			try:
-				item.getItemData().rename(new_name)
+				obj.rename(new_value)
 				self._onDataChanged(index)
 				return True
 			except DbError, e:
@@ -391,9 +429,8 @@ class DBModel(QAbstractItemModel):
 			item.removeChild(row)
 		self.endRemoveRows()
 
-	def refreshIndex(self, index):
+	def _refreshIndex(self, index):
 		self.removeRows(0, self.rowCount(index), index)
-		print ">>>", index.row()
 		index.internalPointer().populated = False
 		if index.internalPointer().populate():
 			self._onDataChanged(index)		
@@ -401,4 +438,94 @@ class DBModel(QAbstractItemModel):
 	def _onDataChanged(self, indexFrom, indexTo=None):
 		if indexTo == None: indexTo = indexFrom
 		self.emit( SIGNAL('dataChanged(const QModelIndex &, const QModelIndex &)'), indexFrom, indexTo)
+
+
+	DB_MAN_TABLE_MIME = "application/dbmanager.table.list.list"
+
+	def mimeTypes(self):
+		return QStringList() << self.DB_MAN_TABLE_MIME
+
+	def mimeData(self, indexes):
+		mimeData = QMimeData()
+		encodedData = QByteArray()
+
+		stream = QDataStream(encodedData, QIODevice.WriteOnly)
+
+		for index in indexes:
+			stream.writeQStringList( self._getPath(index) )
+
+		mimeData.setData(self.DB_MAN_TABLE_MIME, encodedData)
+		return mimeData
+
+
+	def dropMimeData(self, data, action, row, column, parent):
+		if action == Qt.IgnoreAction:
+			return True
+
+		if not data.hasFormat(self.DB_MAN_TABLE_MIME):
+			return False
+
+		encodedData = data.data(self.DB_MAN_TABLE_MIME)
+		stream = QDataStream(encodedData, QIODevice.ReadOnly)
+
+		added = 0
+		while not stream.atEnd():
+			fromIndex = self._rPath2Index( stream.readQStringList() )
+			if not fromIndex.isValid():
+				continue
+
+			inTable = self.getItem( fromIndex )
+			inDb = inTable.database()
+
+			# retrieve information about the new table's db and schema
+			outItem = parent.internalPointer()
+			outObj = outItem.getItemData()
+			outDb = outObj.database()
+			outSchema = None
+			if isinstance(outItem, SchemaItem):
+				outSchema = outObj
+			elif isinstance(outItem, TableItem):
+				outSchema = outObj.schema()
+
+			# toIndex will point to the parent item of the new table
+			toIndex = parent
+			if isinstance(toIndex.internalPointer(), TableItem):
+				toIndex = toIndex.parent()
+
+			# do not overwrite
+			if outDb == inDb:
+				if outDb.schemas() != None:
+					return False
+				if outSchema == inTable.schema():
+					return False
+
+			# create the output uri
+			uri = outDb.uri()
+			schema = outSchema.name if outDb.schemas() != None and outSchema != None else QString()
+			geomCol = inTable.geomColumn if inTable.type == Table.VectorType else QString()
+			pk = QString()
+			for fld in inTable.fields():
+				if fld.primaryKey:
+					pk = fld.name
+					break
+			uri.setDataSource( schema, inTable.name, geomCol, QString(), pk )
+
+			params = []
+			params.append( inTable.toMapLayer() )	# input layer
+			params.append( outDb.connection().providerName() )	# output providerKey
+			params.append( uri.uri() )	# output uri
+			params.append( None )	# destination CRS
+
+			self.emit( SIGNAL("importVector"), params, toIndex )
+		return True
+
+
+	def importVector(self, params, parent):
+		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
+		ret, errMsg = QgsProviderRegistry.instance().importVector( *params )
+		QApplication.restoreOverrideCursor()
+		if ret != 0:
+			QMessageBox.warning( None, "Error [%d]" % ret, errMsg )
+		else:
+			self._refreshIndex( parent )
 

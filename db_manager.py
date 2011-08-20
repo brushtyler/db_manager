@@ -113,7 +113,6 @@ class DBManager(QMainWindow):
 		elif current_tab == self.preview:
 			self.preview.loadPreview( item )
 
-
 	def showSqlWindow(self):
 		db = self.tree.currentDatabase()
 		if db == None:

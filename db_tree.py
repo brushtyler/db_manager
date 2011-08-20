@@ -30,6 +30,9 @@ class DBTree(QTreeView):
 		QTreeView.__init__(self, parent)
 		self.setModel( DBModel(self) )
 		self.setHeaderHidden(True)
+		self.setDragEnabled(True)
+		self.setAcceptDrops(True)
+		self.setDropIndicatorShown(True)
 
 		self.connect(self.selectionModel(), SIGNAL("currentChanged(const QModelIndex&, const QModelIndex&)"), self.itemChanged)
 		self.connect(self, SIGNAL("expanded(const QModelIndex&)"), self.itemChanged)
@@ -41,7 +44,7 @@ class DBTree(QTreeView):
 		if item == None:
 			item = self.currentItem()
 			if item == None: return
-		self.model().refreshItemFromData(item)
+		self.model().refreshItem(item)
 
 	def currentItem(self):
 		indexes = self.selectedIndexes()
