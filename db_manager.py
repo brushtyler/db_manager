@@ -99,8 +99,7 @@ class DBManager(QMainWindow):
 
 		# enable/disable tabs
 		self.tabs.setTabEnabled( self.tabs.indexOf(self.table), table != None )
-		self.tabs.setTabEnabled( self.tabs.indexOf(self.preview), table != None and table.type == Table.VectorType and table.geomColumn != None )
-
+		self.tabs.setTabEnabled( self.tabs.indexOf(self.preview), table != None and table.type in [Table.VectorType, Table.RasterType] and table.geomColumn != None )
 		# show the info tab if the current tab is disabled
 		if not self.tabs.isTabEnabled( index ):
 			self.tabs.setCurrentWidget( self.info )

@@ -210,6 +210,7 @@ class TableItem(TreeItem):
 			TableItem.layerPointIcon = QIcon(":/db_manager/icons/layer_point.png")
 			TableItem.layerLineIcon = QIcon(":/db_manager/icons/layer_line.png")
 			TableItem.layerPolygonIcon = QIcon(":/db_manager/icons/layer_polygon.png")
+			TableItem.layerRasterIcon = QIcon(":/db_manager/icons/layer_raster.png")
 			TableItem.layerUnknownIcon = QIcon(":/db_manager/icons/layer_unknown.png")
 			
 	def data(self, column):
@@ -232,8 +233,8 @@ class TableItem(TreeItem):
 					return self.layerPolygonIcon
 				return self.layerUnknownIcon
 
-		#elif self.getItemData().type == Table.RasterType:
-		#	pass
+		elif self.getItemData().type == Table.RasterType:
+			return self.layerRasterIcon
 
 		if self.getItemData().isView:
 			return self.viewIcon

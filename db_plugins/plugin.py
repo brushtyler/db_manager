@@ -463,7 +463,48 @@ class VectorTable(Table):
 			return ret if len(ret) > 0 else None
 		return ret
 
+class RasterTable(Table):
+	def __init__(self, db, schema=None, parent=None):
+		self.type = Table.RasterType
+		self.geomColumn  = self.pixelSizeX = self.pixelSizeY = self.pixelType = self.isExternal =  self.srid = None
+		self.geomType='RASTER'
 
+	def info(self):
+		#from .info_model import RasterTableInfo
+		#return RasterTableInfo(self)
+		pass
+
+	def uri(self):
+		uri = self.database().uri()
+		schema = self.schemaName() if self.schemaName() else ''
+		uri.setDataSource(schema, self.name, self.geomColumn)
+		return uri
+
+	def toMapLayer(self):
+		from qgis.core import QgsRasterLayer
+		uri=str(self.uri().uri())
+		return QgsRasterLayer(uri, self.name)
+
+	def getValidQGisUniqueFields(self, onlyOne=False):
+		""" list of fields valid to load the table as layer in qgis canvas """
+		ret = []
+
+		# add the pk
+		pkcols = filter(lambda x: x.primaryKey, self.fields())
+		if len(pkcols) == 1: ret.append( pkcols[0] )
+
+		"""constraints = self.constraints()
+		if constraints != None:
+			for con in constraints:
+				if con.type in [TableConstraint.TypePrimaryKey] and \
+						len(con.columns) == 1:
+					fld = con.fields()[0]
+					if fld and fld not in ret: 
+						ret.append( fld )"""
+
+		if onlyOne:
+			return ret if len(ret) > 0 else None
+		return ret
 
 class TableSubItemObject(QObject):
 	def __init__(self, table):

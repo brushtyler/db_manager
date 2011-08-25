@@ -50,7 +50,9 @@ class PostGisDBConnector(DBConnector):
 			raise ConnectionError(e)
 		
 		self._checkSpatial()
+		self._checkRaster()
 		self._checkGeometryColumnsTable()
+		self._checkRasterColumnsTable()
 
 	def _connectionInfo(self):
 		conn_str = u''
@@ -69,6 +71,13 @@ class PostGisDBConnector(DBConnector):
 		self.has_spatial = c.fetchone()[0] > 0
 		return self.has_spatial
 	
+	def _checkRaster(self):
+		""" check whether postgis_version is present in catalog """
+		c = self.connection.cursor()
+		self._exec_sql(c, u"SELECT COUNT(*) FROM pg_proc WHERE proname = 'postgis_raster_lib_version'")
+		self.has_raster = c.fetchone()[0] > 0
+		return self.has_raster
+	
 	def _checkGeometryColumnsTable(self):
 		c = self.connection.cursor()
 		self._exec_sql(c, u"SELECT relname FROM pg_class WHERE relname = 'geometry_columns' AND pg_class.relkind IN ('v', 'r')")
@@ -80,6 +89,18 @@ class PostGisDBConnector(DBConnector):
 			# find out whether has privileges to access geometry_columns table
 			self.has_geometry_columns_access = self.getTablePrivileges('geometry_columns')[0]
 		return self.has_geometry_columns
+
+	def _checkRasterColumnsTable(self):
+		c = self.connection.cursor()
+		self._exec_sql(c, u"SELECT relname FROM pg_class WHERE relname = 'raster_columns' AND pg_class.relkind IN ('v', 'r')")
+		self.has_raster_columns = (len(c.fetchall()) != 0)
+		
+		if not self.has_raster_columns:
+			self.has_raster_columns_access = False
+		else:			
+			# find out whether has privileges to access geometry_columns table
+			self.has_raster_columns_access = self.getTablePrivileges('raster_columns')[0]
+		return self.has_raster_columns
 
 	def getInfo(self):
 		c = self.connection.cursor()
@@ -141,10 +162,10 @@ class PostGisDBConnector(DBConnector):
 			tablenames.append( (tbl[2], tbl[1]) )
 			items.append( tbl )
 
-		#rasters = self.getRasterTables(schema)
-		#for tbl in rasters:
-		#	tablenames.append( (tbl[2], tbl[1]) )
-		#	items.append( tbl )
+		rasters = self.getRasterTables(schema)
+		for tbl in rasters:
+			tablenames.append( (tbl[2], tbl[1]) )
+			items.append( tbl )
 
 
 		c = self.connection.cursor()
@@ -235,6 +256,77 @@ class PostGisDBConnector(DBConnector):
 			items.append( item )
 			
 		return items
+
+	def getRasterTables(self, schema=None):
+		""" get list of table with a raster column
+			it returns:
+				name (table name)
+				namespace (schema)
+				type = 'view' (is a view?)
+				owner 
+				tuples
+				pages
+				raster_column:
+					r_column (or pg_attribute.attname, the raster column name)
+					pixel type (or pg_attribute.atttypid::regtype::text, the raster column type name)
+					block size
+					internal or external
+					srid
+		"""
+
+		if not self.has_spatial:
+			return []
+		if not self.has_raster:
+			return []
+
+		c = self.connection.cursor()
+		
+		if schema:
+			schema_where = u" AND nspname = %s " % self.quoteString(schema)
+		else:
+			schema_where = u" AND (nspname != 'information_schema' AND nspname !~ 'pg_') "
+
+		geometry_column_from = u""
+		if self.has_raster_columns and self.has_raster_columns_access:
+			geometry_column_from = u"""LEFT OUTER JOIN raster_columns AS geo ON 
+						cla.relname = geo.r_table_name AND nsp.nspname = r_table_schema AND 
+						lower(att.attname) = lower(r_column)"""
+			
+
+		# discovery of all tables and whether they contain a geometry column
+		sql = u"""SELECT 
+						cla.relname, nsp.nspname, cla.relkind = 'v', pg_get_userbyid(relowner), cla.reltuples, cla.relpages, 
+						CASE WHEN geo.r_column IS NOT NULL THEN geo.r_column ELSE att.attname END, 
+						geo.pixel_types,
+						geo.scale_x,
+						geo.scale_y,
+						geo.out_db,
+						geo.srid
+
+					FROM pg_class AS cla 
+					JOIN pg_namespace AS nsp ON 
+						nsp.oid = cla.relnamespace
+
+					JOIN pg_attribute AS att ON 
+						att.attrelid = cla.oid AND 
+						att.atttypid = 'raster'::regtype OR 
+						att.atttypid IN (SELECT oid FROM pg_type WHERE typbasetype='raster'::regtype ) 
+
+					""" + geometry_column_from + """ 
+
+					WHERE cla.relkind IN ('v', 'r') """ + schema_where + """ 
+					ORDER BY nsp.nspname, cla.relname, att.attname"""
+
+		self._exec_sql(c, sql)
+
+		items = []
+		for i, tbl in enumerate(c.fetchall()):
+			item = list(tbl)
+			item.insert(0, Table.RasterType)
+			items.append( item )
+			
+		return items
+
 
 	def getTableRowCount(self, table, schema=None):
 		c = self.connection.cursor()
