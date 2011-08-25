@@ -1,0 +1,11 @@
+DB Manager * Copyright (c) 2011 Giuseppe Sucameli
+
+DB Manager is a database manager plugin for QuantumGIS.
+It allows to you to show the DBs contents and run query on them.
+
+For more info about the project, see at the wiki page:
+    http://www.qgis.org/wiki/DB_Manager_plugin_GSoC_2011
+
+or visit my GitHub repository:
+    https://github.com/brushtyler/db_manager
+
