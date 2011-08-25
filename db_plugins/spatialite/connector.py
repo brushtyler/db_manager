@@ -252,8 +252,13 @@ class SpatiaLiteDBConnector(DBConnector):
 
 	def deleteTable(self, table, schema=None):
 		""" delete table from the database """
+		c = self.connection.cursor()
 		sql = u"DROP TABLE %s" % self.quoteId(table)
-		self._exec_sql_and_commit(sql)
+		self._exec_sql(c, sql)
+		sql = u"DELETE FROM geometry_columns WHERE lower(f_table_name) = lower(%s)" % self.quoteString(table)
+		self._exec_sql(c, sql)
+		self.connection.commit()
+
 
 	def emptyTable(self, table, schema=None):
 		""" delete all rows from table """
