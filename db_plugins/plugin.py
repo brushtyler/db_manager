@@ -238,9 +238,7 @@ class Database(DbItemObject):
 		res = QMessageBox.question(parent, "hey!", u"Really delete all items from table %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
 		if res != QMessageBox.Yes:
 			return
-		self.connector.emptyTable(item.name, item.schemaName())
-		item.refreshRowCount()
-		item.emit( SIGNAL('changed') )
+		item.empty()
 		return
 
 
@@ -298,12 +296,23 @@ class Table(DbItemObject):
 	def quotedName(self):
 		return self.database().connector.quoteId( (self.schemaName(), self.name) )
 
+
 	def delete(self):
 		if self.isView:
 			self.database().connector.deleteView(self.name, self.schemaName())
 		else:
 			self.database().connector.deleteTable(self.name, self.schemaName())
 		self.emit( SIGNAL('deleted') )
+
+	def rename(self, new_name):
+		self.database().connector.renameTable(self.name, new_name, self.schemaName())
+		self.name = new_name
+		self.emit( SIGNAL('changed') )
+
+	def empty(self):
+		self.connector.emptyTable(item.name, item.schemaName())
+		self.refreshRowCount()
+		self.emit( SIGNAL('changed') )
 
 
 	def info(self):
@@ -313,14 +322,44 @@ class Table(DbItemObject):
 	def uri(self):
 		uri = self.database().uri()
 		schema = self.schemaName() if self.schemaName() else ''
-		geomCol = self.geomColumn if self.type == Table.VectorType else QString()
-		uri.setDataSource(schema, self.name, geomCol)
+		geomCol = self.geomColumn if self.type in [Table.VectorType, Table.RasterType] else QString()
+		pk = self.getValidQGisUniqueFields(True)
+		uri.setDataSource(schema, self.name, geomCol if geomCol else QString(), QString(), pk.name if pk else QString())
 		return uri
 
+	def mimeUri(self):
+		layerType = "raster" if self.type == Table.RasterType else "vector"
+		return u"%s:%s:%s:%s" % (layerType, self.database().dbplugin().providerName(), self.name, self.uri().uri())
+
 	def toMapLayer(self):
-		from qgis.core import QgsVectorLayer
+		from qgis.core import QgsVectorLayer, QgsRasterLayer
 		provider = self.database().dbplugin().providerName()
-		return QgsVectorLayer(self.uri().uri(), self.name, provider)
+		uri = self.uri().uri()
+		if self.type == Table.RasterType:
+			return QgsRasterLayer(uri, self.name, provider)
+		return QgsVectorLayer(uri, self.name, provider)
+
+	def getValidQGisUniqueFields(self, onlyOne=False):
+		""" list of fields valid to load the table as layer in qgis canvas """
+		ret = []
+
+		# add the pk
+		pkcols = filter(lambda x: x.primaryKey, self.fields())
+		if len(pkcols) == 1: ret.append( pkcols[0] )
+
+		# add both serial and int4 fields with an unique index
+		indexes = self.indexes()
+		if indexes != None:
+			for idx in indexes:
+				if idx.isUnique and len(idx.columns) == 1:
+					fld = idx.fields()[ idx.columns[0] ]
+					if fld and fld not in ret and fld.dataType in ["oid", "serial", "int4"]:
+						ret.append( fld )
+
+		if onlyOne:
+			return ret[0] if len(ret) > 0 else None
+		return ret
+
 
 	def dataModel(self, parent):
 		pass
@@ -442,69 +481,16 @@ class VectorTable(Table):
 		from .info_model import VectorTableInfo
 		return VectorTableInfo(self)
 
-	def getValidQGisUniqueFields(self, onlyOne=False):
-		""" list of fields valid to load the table as layer in qgis canvas """
-		ret = []
-
-		# add the pk
-		pkcols = filter(lambda x: x.primaryKey, self.fields())
-		if len(pkcols) == 1: ret.append( pkcols[0] )
-
-		"""constraints = self.constraints()
-		if constraints != None:
-			for con in constraints:
-				if con.type in [TableConstraint.TypePrimaryKey] and \
-						len(con.columns) == 1:
-					fld = con.fields()[0]
-					if fld and fld not in ret: 
-						ret.append( fld )"""
-
-		if onlyOne:
-			return ret if len(ret) > 0 else None
-		return ret
-
 class RasterTable(Table):
 	def __init__(self, db, schema=None, parent=None):
 		self.type = Table.RasterType
-		self.geomColumn  = self.pixelSizeX = self.pixelSizeY = self.pixelType = self.isExternal =  self.srid = None
-		self.geomType='RASTER'
+		self.geomColumn = self.geomType = self.pixelSizeX = self.pixelSizeY = self.pixelType = self.isExternal = self.srid = None
 
 	def info(self):
 		#from .info_model import RasterTableInfo
 		#return RasterTableInfo(self)
 		pass
 
-	def uri(self):
-		uri = self.database().uri()
-		schema = self.schemaName() if self.schemaName() else ''
-		uri.setDataSource(schema, self.name, self.geomColumn)
-		return uri
-
-	def toMapLayer(self):
-		from qgis.core import QgsRasterLayer
-		uri=str(self.uri().uri())
-		return QgsRasterLayer(uri, self.name)
-
-	def getValidQGisUniqueFields(self, onlyOne=False):
-		""" list of fields valid to load the table as layer in qgis canvas """
-		ret = []
-
-		# add the pk
-		pkcols = filter(lambda x: x.primaryKey, self.fields())
-		if len(pkcols) == 1: ret.append( pkcols[0] )
-
-		"""constraints = self.constraints()
-		if constraints != None:
-			for con in constraints:
-				if con.type in [TableConstraint.TypePrimaryKey] and \
-						len(con.columns) == 1:
-					fld = con.fields()[0]
-					if fld and fld not in ret: 
-						ret.append( fld )"""
-
-		if onlyOne:
-			return ret if len(ret) > 0 else None
-		return ret
 
 class TableSubItemObject(QObject):
 	def __init__(self, table):
@@ -591,6 +577,7 @@ class TableIndex(TableSubItemObject):
 		for num in self.columns:
 			cols[num] = fieldFromNum(num, fields)
 		return cols
+
 
 class TableTrigger(TableSubItemObject):
 	""" class that represents a trigger """

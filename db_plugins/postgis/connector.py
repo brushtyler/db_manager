@@ -80,24 +80,29 @@ class PostGisDBConnector(DBConnector):
 	
 	def _checkGeometryColumnsTable(self):
 		c = self.connection.cursor()
-		self._exec_sql(c, u"SELECT relname FROM pg_class WHERE relname = 'geometry_columns' AND pg_class.relkind IN ('v', 'r')")
-		self.has_geometry_columns = (len(c.fetchall()) != 0)
+		self._exec_sql(c, u"SELECT relkind = 'v' FROM pg_class WHERE relname = 'geometry_columns' AND relkind IN ('v', 'r')")
+		res = c.fetchone()
+		self.has_geometry_columns = (res != None and len(res) != 0)
 		
 		if not self.has_geometry_columns:
-			self.has_geometry_columns_access = False
-		else:			
+			self.has_geometry_columns_access = self.is_geometry_columns_view = False
+		else:
+			self.is_geometry_columns_view = not res[0]
 			# find out whether has privileges to access geometry_columns table
-			self.has_geometry_columns_access = self.getTablePrivileges('geometry_columns')[0]
+			priv = self.getTablePrivileges('geometry_columns')
+			self.has_geometry_columns_access = priv[0]
 		return self.has_geometry_columns
 
 	def _checkRasterColumnsTable(self):
 		c = self.connection.cursor()
-		self._exec_sql(c, u"SELECT relname FROM pg_class WHERE relname = 'raster_columns' AND pg_class.relkind IN ('v', 'r')")
-		self.has_raster_columns = (len(c.fetchall()) != 0)
+		self._exec_sql(c, u"SELECT relkind = 'v' FROM pg_class WHERE relname = 'raster_columns' AND relkind IN ('v', 'r')")
+		res = c.fetchone()
+		self.has_raster_columns = (res != None and len(res) != 0)
 		
 		if not self.has_raster_columns:
-			self.has_raster_columns_access = False
-		else:			
+			self.has_raster_columns_access = self.is_raster_columns_view = False
+		else:
+			self.is_raster_columns_view = not res[0]
 			# find out whether has privileges to access geometry_columns table
 			self.has_raster_columns_access = self.getTablePrivileges('raster_columns')[0]
 		return self.has_raster_columns
@@ -212,6 +217,10 @@ class PostGisDBConnector(DBConnector):
 		if not self.has_spatial:
 			return []
 
+		# do not display sys_tables as geometry tables
+		sys_tables = []
+		if self.has_raster: sys_tables.append('raster_columns')
+
 		c = self.connection.cursor()
 		
 		if schema:
@@ -251,6 +260,8 @@ class PostGisDBConnector(DBConnector):
 
 		items = []
 		for i, tbl in enumerate(c.fetchall()):
+			if tbl[0] in sys_tables and tbl[1] in ['', 'public']:
+				continue
 			item = list(tbl)
 			item.insert(0, Table.VectorType)
 			items.append( item )
@@ -489,15 +500,36 @@ class PostGisDBConnector(DBConnector):
 		self._exec_sql_and_commit(sql)
 		return True
 
+
+	def isVectorTable(self, table, schema=None):
+		if self.has_geometry_columns and self.has_geometry_columns_access:
+			c = self.connection.cursor()
+			sql = u"SELECT count(*) FROM geometry_columns WHERE f_table_schema = %s AND f_table_name = %s" % (self.quoteString(schema), self.quoteString(table))
+			self._exec_sql(c, sql)
+			return c.fetchone()[0] > 0
+		return False
+
+	def isRasterTable(self, table, schema=None):
+		if self.has_raster_columns and self.has_raster_columns_access:
+			c = self.connection.cursor()
+			sql = u"SELECT count(*) FROM raster_columns WHERE r_table_schema = %s AND r_table_name = %s" % (self.quoteString(schema), self.quoteString(table))
+			self._exec_sql(c, sql)
+			return c.fetchone()[0] > 0
+		return False		
+
+
 	def deleteTable(self, table, schema=None):
-		""" delete table and its reference in geometry_columns """
-		if self.has_spatial and self.has_geometry_columns and self.has_geometry_columns_access:
-			schema_part = u"%s, " % self.quoteString(schema) if schema is not None else ""
+		""" delete table and its reference in either geometry_columns or raster_columns """
+		schema_part = u"%s, " % self.quoteString(schema) if schema is not None else ""
+		if self.isVectorTable(table, schema):
 			sql = u"SELECT DropGeometryTable(%s%s)" % (schema_part, self.quoteString(table))
+		elif self.isRasterTable(table, schema):
+			sql = u"SELECT DropRasterTable(%s%s)" % (schema_part, self.quoteString(table))
 		else:
 			sql = u"DROP TABLE %s" % self.quoteId( (schema, table) )
 		self._exec_sql_and_commit(sql)
-		
+
+
 	def emptyTable(self, table, schema=None):
 		""" delete all rows from table """
 		sql = u"TRUNCATE %s" % self.quoteId( (schema, table) )
@@ -513,7 +545,7 @@ class PostGisDBConnector(DBConnector):
 		self._exec_sql(c, sql)
 		
 		# update geometry_columns if postgis is enabled
-		if self.has_geometry_columns_access:
+		if self.has_geometry_columns and self.is_geometry_columns_view:
 			schema_where = u" AND f_table_schema=%s " % self.quoteString(schema) if schema is not None else ""
 			sql = u"UPDATE geometry_columns SET f_table_name=%s WHERE f_table_name=%s %s" % (self.quoteString(new_table), self.quoteString(table), schema_where)
 			self._exec_sql(c, sql)
@@ -529,7 +561,7 @@ class PostGisDBConnector(DBConnector):
 		self._exec_sql(c, sql)
 		
 		# update geometry_columns if postgis is enabled
-		if self.has_geometry_columns_access:
+		if self.has_geometry_columns and self.is_geometry_columns_view:
 			schema_where = u" AND f_table_schema=%s " % self.quoteString(schema) if schema is not None else ""
 			sql = u"UPDATE geometry_columns SET f_table_schema=%s WHERE f_table_name=%s %s" % (self.quoteString(new_schema), self.quoteString(table), schema_where)
 			self._exec_sql(c, sql)
@@ -557,7 +589,7 @@ class PostGisDBConnector(DBConnector):
 		self._exec_sql(c, sql)
 
 		# update geometry_columns if postgis is enabled
-		if self.has_geometry_columns_access:
+		if self.has_geometry_columns and self.is_geometry_columns_view:
 			schema_where = u" f_table_schema=%s AND " % self.quoteString(schema) if schema is not None else ""
 			schema_part = u" f_table_schema=%s, " % self.quoteString(schema) if schema is not None else ""
 			sql = u"UPDATE geometry_columns SET %s f_table_name=%s WHERE %s f_table_name=%s" % (schema_part, self.quoteString(new_schema), self.quoteString(new_table), schema_where, self.quoteString(table))

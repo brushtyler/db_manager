@@ -74,7 +74,7 @@ class LayerPreview(QgsMapCanvas):
 		if table.geomType:
 			# limit the query result if required
 			if limit and table.rowCount > 1000:
-				uniqueField = table.getValidUniqueFields(True)
+				uniqueField = table.getValidQGisUniqueFields(True)
 				if uniqueField == None:
 					QMessageBox.warning(self, "Sorry", "Unable to find a valid unique field")
 					return

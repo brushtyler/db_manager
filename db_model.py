@@ -25,9 +25,10 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from .db_plugins import supportedDbTypes, createDbPlugin
-from .db_plugins.plugin import InvalidDataException, ConnectionError, Table
+from .db_plugins.plugin import InvalidDataException, ConnectionError, DbError, Table
+from dlg_db_error import DlgDbError
 
-from qgis.core import QgsProviderRegistry
+import qgis.core
 
 try:
 	from . import resources_rc
@@ -123,8 +124,7 @@ class PluginItem(TreeItem):
 		return self.getItemData().icon()
 
 	def path(self):
-		return QStringList() << self.data(0)
-
+		return QStringList() << self.getItemData().typeName()
 
 class ConnectionItem(TreeItem):
 	def __init__(self, connection, parent=None):
@@ -257,8 +257,9 @@ class DBModel(QAbstractItemModel):
 		QAbstractItemModel.__init__(self, parent)
 		self.header = ['Databases']
 
-		self.isImportVectorAvail = hasattr(QgsProviderRegistry.instance(), 'importVector')
-		self.connect(self, SIGNAL("importVector"), self.importVector)
+		self.isImportVectorAvail = hasattr(qgis.core, 'QgsVectorLayerImport')
+		if self.isImportVectorAvail:
+			self.connect(self, SIGNAL("importVector"), self.importVector)
 
 		self.rootItem = TreeItem(None, None)
 		for dbtype in supportedDbTypes():
@@ -441,10 +442,10 @@ class DBModel(QAbstractItemModel):
 		self.emit( SIGNAL('dataChanged(const QModelIndex &, const QModelIndex &)'), indexFrom, indexTo)
 
 
-	DB_MAN_TABLE_MIME = "application/dbmanager.table.list.list"
+	QGIS_URI_MIME = "application/x-vnd.qgis.qgis.uri"
 
 	def mimeTypes(self):
-		return QStringList() << self.DB_MAN_TABLE_MIME
+		return QStringList() << self.QGIS_URI_MIME
 
 	def mimeData(self, indexes):
 		mimeData = QMimeData()
@@ -453,9 +454,14 @@ class DBModel(QAbstractItemModel):
 		stream = QDataStream(encodedData, QIODevice.WriteOnly)
 
 		for index in indexes:
-			stream.writeQStringList( self._getPath(index) )
+			if not index.isValid():
+				continue
+			if not isinstance(index.internalPointer(), TableItem):
+				continue
+			table = self.getItem( index )
+			stream.writeQString( table.mimeUri() )
 
-		mimeData.setData(self.DB_MAN_TABLE_MIME, encodedData)
+		mimeData.setData(self.QGIS_URI_MIME, encodedData)
 		return mimeData
 
 
@@ -463,20 +469,33 @@ class DBModel(QAbstractItemModel):
 		if action == Qt.IgnoreAction:
 			return True
 
-		if not data.hasFormat(self.DB_MAN_TABLE_MIME):
+		if not data.hasFormat(self.QGIS_URI_MIME):
 			return False
 
-		encodedData = data.data(self.DB_MAN_TABLE_MIME)
+		encodedData = data.data(self.QGIS_URI_MIME)
 		stream = QDataStream(encodedData, QIODevice.ReadOnly)
 
 		added = 0
 		while not stream.atEnd():
-			fromIndex = self._rPath2Index( stream.readQStringList() )
-			if not fromIndex.isValid():
+			mimeUri = stream.readQString()
+			print ">>>mimeUri", mimeUri
+
+			parts = QStringList() << unicode(mimeUri).split(":", 4)
+			if len(parts) != 4:
+				# invalid qgis mime uri
+				print ">>>invalid mimeUri: parts", parts.join( "," )
 				continue
 
-			inTable = self.getItem( fromIndex )
-			inDb = inTable.database()
+			layerType, providerKey, layerName, uriString = parts
+			if layerType == 'raster':
+				continue
+				inLayer = qgis.core.QgsRasterLayer(uriString, layerName, providerKey)
+			else:
+				inLayer = qgis.core.QgsVectorLayer(uriString, layerName, providerKey)
+			if not inLayer.isValid():
+				print ">>>invalid inLayer"
+				# invalid layer
+				continue
 
 			# retrieve information about the new table's db and schema
 			outItem = parent.internalPointer()
@@ -488,42 +507,50 @@ class DBModel(QAbstractItemModel):
 			elif isinstance(outItem, TableItem):
 				outSchema = outObj.schema()
 
+			print ">>>out db",outDb, " schema",outSchema
+
 			# toIndex will point to the parent item of the new table
 			toIndex = parent
 			if isinstance(toIndex.internalPointer(), TableItem):
 				toIndex = toIndex.parent()
 
-			# do not overwrite
-			if outDb == inDb:
-				if outDb.schemas() != None:
-					return False
-				if outSchema == inTable.schema():
-					return False
+			if inLayer.type() == inLayer.VectorLayer:
+				# create the output uri
+				schema = outSchema.name if outDb.schemas() != None and outSchema != None else QString()
+				pkCol = geomCol = QString()
+				sql = inLayer.subsetString()
 
-			# create the output uri
-			uri = outDb.uri()
-			schema = outSchema.name if outDb.schemas() != None and outSchema != None else QString()
-			geomCol = inTable.geomColumn if inTable.type == Table.VectorType else QString()
-			pk = QString()
-			for fld in inTable.fields():
-				if fld.primaryKey:
-					pk = fld.name
-					break
-			uri.setDataSource( schema, inTable.name, geomCol, QString(), pk )
+				if providerKey == 'ogr':
+					# TODO: ask for pk and geom field name
+					pkCol = "pk"
+					geomCol = "the_geom" if inLayer.hasGeometryType() else QString()
 
-			params = []
-			params.append( inTable.toMapLayer() )	# input layer
-			params.append( outDb.connection().providerName() )	# output providerKey
-			params.append( uri.uri() )	# output uri
-			params.append( None )	# destination CRS
+				elif providerKey in ['postgres', 'spatialite']:
+					inUri = qgis.core.QgsDataSourceURI( inLayer.source() )
+					pkCol = inUri.keyColumn()
+					geomCol = inUri.geometryColumn()
 
-			self.emit( SIGNAL("importVector"), params, toIndex )
-		return True
+				outUri = outDb.uri()
+				outUri.setDataSource( schema, layerName, geomCol, sql, pkCol )
+
+				params = []
+				params.append( inLayer )	# input layer
+				params.append( outUri.uri() )	# output uri
+				params.append( outDb.dbplugin().providerName() )	# output providerKey
+				params.append( None )	# destination CRS
+
+				print ">>>emit import!"
+				added = added + 1
+				self.emit( SIGNAL("importVector"), params, toIndex )
+
+		return added > 0
 
 
 	def importVector(self, params, parent):
 		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
-		ret, errMsg = QgsProviderRegistry.instance().importVector( *params )
+		print ">>>before import!"
+		ret, errMsg = qgis.core.QgsVectorLayerImport.importLayer( *params )
+		print ">>>after import!"
 		QApplication.restoreOverrideCursor()
 		if ret != 0:
 			QMessageBox.warning( None, "Error [%d]" % ret, errMsg )

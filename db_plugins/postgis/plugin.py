@@ -189,57 +189,33 @@ class PGVectorTable(PGTable, VectorTable):
 		from .info_model import PGVectorTableInfo
 		return PGVectorTableInfo(self)
 
-	def getValidUniqueFields(self, onlyOne=False):
-		""" list of fields valid to load the table as layer in qgis canvas """
-		ret = Table.getUniqueFieldsForLayer(self)
-		# add both serial and int4 fields with an unique index
-		indexes = self.indexes()
-		if indexes != None:
-			for idx in indexes:
-				if idx.isUnique and len(idx.columns) == 1:
-					fld = idx.fields()[0]
-					if fld and fld not in ret and fld.type in ["oid", "serial", "int4"]:
-						ret.append( fld )
-
-		if onlyOne:
-			return ret if len(ret) > 0 else None
-		return ret
-
 class PGRasterTable(PGTable, RasterTable):
 	def __init__(self, row, db, schema=None):
 		PGTable.__init__(self, row[:-6], db, schema)
 		RasterTable.__init__(self, db, schema)
 		self.geomColumn, self.pixelType, self.pixelSizeX, self.pixelSizeY, self.isExternal, self.srid = row[-6:]
-		self.geomType='RASTER'
+		self.geomType = 'RASTER'
 
 	def info(self):
 		from .info_model import PGRasterTableInfo
 		return PGRasterTableInfo(self)
 
-	def getValidUniqueFields(self, onlyOne=False):
-		""" list of fields valid to load the table as layer in qgis canvas """
-		ret = Table.getUniqueFieldsForLayer(self)
-		# add both serial and int4 fields with an unique index
-		indexes = self.indexes()
-		if indexes != None:
-			for idx in indexes:
-				if idx.isUnique and len(idx.columns) == 1:
-					fld = idx.fields()[0]
-					if fld and fld not in ret and fld.type in ["oid", "serial", "int4"]:
-						ret.append( fld )
+	def gdalUri(self):
+		uri = self.database().uri()
+		schema = ( u'schema=%s' % self.schemaName() ) if self.schemaName() else ''
+		gdalUri = u'PG: dbname=%s host=%s user=%s password=%s port=%s mode=2 %s table=%s' % (uri.database(), uri.host(), uri.username(), uri.password(), uri.port(), schema, self.name)
+		return QString( gdalUri )
 
-		if onlyOne:
-			return ret if len(ret) > 0 else None
-		return ret
+	def mimeUri(self):
+		uri = u"raster:gdal:%s:%s" % (self.name, self.gdalUri())
+		return QString( uri )
 	
 	def toMapLayer(self):
 		from qgis.core import QgsRasterLayer 
-		uri=self.uri()
-		schema = "schema="+self.schemaName() if self.schemaName() else ''
-		pgrasterUri= ('PG: dbname=%s host=%s user=%s password=%s port=%s mode=2 %s table=%s') % (uri.database(), uri.host(), uri.username(), uri.password(), uri.port(),schema,self.name)
-		rasterLayer=QgsRasterLayer(pgrasterUri, self.name)
-		rasterLayer.setContrastEnhancementAlgorithm("StretchToMinimumMaximum")
-		return rasterLayer
+		rl = QgsRasterLayer(self.gdalUri(), self.name)
+		if rl.isValid():
+			rl.setContrastEnhancementAlgorithm("StretchToMinimumMaximum")
+		return rl
 
 class PGTableField(TableField):
 	def __init__(self, row, table):

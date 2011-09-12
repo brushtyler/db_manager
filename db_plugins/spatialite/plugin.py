@@ -130,12 +130,9 @@ class SLVectorTable(SLTable, VectorTable):
 
 	def uri(self):
 		uri = self.database().uri()
-		uri.setDataSource('', self.geomTableName, self.geomColumn)
+		pk = self.getValidQGisUniqueFields(True)
+		uri.setDataSource('', self.geomTableName, self.geomColumn, QString(), pk.name if pk else QString())
 		return uri
-
-	def getValidUniqueFields(self, onlyOne=False):
-		""" list of fields valid to load the table as layer in qgis canvas """
-		return [ "ROWID" ] if not onlyOne else "ROWID"
 
 
 class SLTableField(TableField):

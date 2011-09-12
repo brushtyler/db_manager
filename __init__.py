@@ -27,10 +27,13 @@ def description():
 	return "Manage your databases within QGis"
 
 def version():
-	return "0.0.3"
+	return "0.0.4"
 
 def qgisMinimumVersion():
 	return "1.7.0"
+
+#def icon():
+#	return "icons/dbmanager.png"
 
 def authorName():
 	return "Giuseppe Sucameli"
