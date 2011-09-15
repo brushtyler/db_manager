@@ -106,10 +106,39 @@ class DbTableModel(BaseTableModel):
 
 
 class DbSqlModel(BaseTableModel):
-	def __init__(self, header, data, parent=None):
+	def __init__(self, db, sql, parent=None):
+		self.db = db.connector
+		c = self.db._get_cursor()
+
+		t = QTime()
+		t.start()
+		self.db._execute(c, unicode(sql))
+		self._secs = t.elapsed() / 1000.0
+		del t
+
+		data = []
+		try:
+			header = self.db._get_columns(c)
+			if len(header) > 0:
+				data = self.db._fetchall(c)
+				self._rowCount = len(data)
+			else:
+				self._rowCount = c.rowcount
+		except DbError:
+			# nothing to fetch!
+			data = []
+			header = []
+
 		BaseTableModel.__init__(self, header, data, parent)
 
-	def secs(self):
-		pass
+		# commit before closing the cursor to make sure that the changes are stored
+		self.db._commit()
+		c.close()
+		del c
 
+	def secs(self):
+		return self._secs
+
+	def rowCount(self, parent=None):
+		return self._rowCount
 

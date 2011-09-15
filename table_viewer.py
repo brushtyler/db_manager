@@ -31,7 +31,6 @@ class TableViewer(QTableView):
 		QTableView.__init__(self, parent)
 		self._clear()
 
-
 	def refresh(self):
 		self.loadData( self.item, True )
 

@@ -367,10 +367,11 @@ class VectorTableInfo(TableInfo):
 		# only if we have info from geometry_columns
 		if self.table.geomDim:
 			tbl.append( ("Dimension:", self.table.geomDim) )
-		if self.table.srid:
-			sr_info = self.table.database().connector.getSpatialRefInfo(self.table.srid) if self.table.srid != -1 else "Undefined"
-			if sr_info:
-				tbl.append( ("Spatial ref:", u"%s (%d)" % (sr_info, self.table.srid)) )
+
+		srid = self.table.srid if self.table.srid != None else -1
+		sr_info = self.table.database().connector.getSpatialRefInfo(srid) if srid != -1 else "Undefined"
+		if sr_info:
+			tbl.append( ("Spatial ref:", u"%s (%d)" % (sr_info, srid)) )
 
 		# estimated extent
 		if not self.table.isView:
@@ -418,10 +419,10 @@ class RasterTableInfo(TableInfo):
 		]
 
 		# only if we have info from geometry_columns
-		if self.table.srid:
-			sr_info = self.table.database().connector.getSpatialRefInfo(self.table.srid) if self.table.srid != -1 else "Undefined"
-			if sr_info:
-				tbl.append( ("Spatial ref:", u"%s (%d)" % (sr_info, self.table.srid)) )
+		srid = self.table.srid if self.table.srid != None else -1
+		sr_info = self.table.database().connector.getSpatialRefInfo(srid) if srid != -1 else "Undefined"
+		if sr_info: 
+			tbl.append( ("Spatial ref:", u"%s (%d)" % (sr_info, srid)) )
 
 		# estimated extent
 		if not self.table.isView:

@@ -36,66 +36,46 @@ class PGTableModel(DbTableModel):
 			self.table.refreshRowCount()
 			if self.table.rowCount == None:
 				return
+		self._createCursor()
 
-		fields_txt = ", ".join(self.fields)
+	def _createCursor(self):
+		fields_txt = u", ".join(self.fields)
 		table_txt = self.db.quoteId( (self.table.schemaName(), self.table.name) )
 
 		# create named cursor and run query
-		self.cursor = self.db._get_cursor( table.name )
+		self.cursor = self.db._get_cursor(self.table.name)
 		sql = u"SELECT %s FROM %s" % (fields_txt, table_txt)
-		self.cursor.execute(sql)
+		self.db._execute(self.cursor, sql)
 
 	def _sanitizeTableField(self, field):
 		# get fields, ignore geometry columns
 		if field.dataType.lower() == "geometry":
-			#TODO use ST_GeometryType instead
 			return u'GeometryType(%s)' % self.db.quoteId(field.name)
 		elif field.dataType.lower() == "raster":
-			return '\'RASTER\''
-		return self.db.quoteId(field.name)
+			return u"'RASTER'"
+		return u"%s::text" % self.db.quoteId(field.name)
 
 
 	def __del__(self):
 		# close cursor and save memory
-		if self.cursor:
-			self.cursor.close()
+		self.cursor.close()
+		del self.cursor
 		print "PGTableModel.__del__"
 
 	def fetchMoreData(self, row_start):
-		self.cursor.scroll(row_start, mode='absolute')
+		import psycopg2
+		try:
+			self.cursor.scroll(row_start, mode='absolute')
+		except psycopg2.ProgrammingError:
+			self.cursor.close()
+			del self.cursor
+			self._createCursor()
+			return self.fetchMoreData(row_start)
+
 		self.resdata = self.cursor.fetchmany(self.fetchedCount)
 		self.fetchedFrom = row_start
 
 
 class PGSqlModel(DbSqlModel):
-	def __init__(self, db, sql, parent=None):
-		self.db = db.connector
-		c = self.db._get_cursor()
-
-		t = QTime()
-		t.start()
-		self.db._exec_sql(c, unicode(sql))
-		self._secs = t.elapsed() / 1000.0
-		del t
-
-		data = []
-		header = []
-		if c.description:
-			header = map(lambda x: x[0], c.description)
-			try:
-				data = self.db._fetchall(c)
-			except DbError:
-				# nothing to fetch!
-				data = []
-				header = []
-
-		DbSqlModel.__init__(self, header, data, parent)
-
-		# commit before closing the cursor to make sure that the changes are stored
-		self.db.connection.commit()
-		c.close()
-
-	def secs(self):
-		return self._secs
-
+	pass
 

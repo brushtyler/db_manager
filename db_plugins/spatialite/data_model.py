@@ -34,12 +34,13 @@ class SLTableModel(DbTableModel):
 		table_txt = self.db.quoteId( (self.table.schemaName(), self.table.name) )
 		
 		# run query and get results
-		cursor = self.db._get_cursor()
 		sql = u"SELECT %s FROM %s" % (fields_txt, table_txt)
-		cursor.execute(sql)
+		c = self.db._get_cursor()
+		self.db._execute(c, sql)
 
-		self.resdata = cursor.fetchall()
-		cursor.close()
+		self.resdata = self.db._fetchall(c)
+		c.close()
+		del c
 
 		self.fetchedFrom = 0
 		self.fetchedCount = len(self.resdata)
@@ -48,7 +49,6 @@ class SLTableModel(DbTableModel):
 	def _sanitizeTableField(self, field):
 		# get fields, ignore geometry columns
 		if field.dataType.lower() == "geometry":
-			#TODO use ST_GeometryType instead
 			return u'GeometryType(%s)' % self.db.quoteId(field.name)
 		return self.db.quoteId(field.name)
 
@@ -57,33 +57,5 @@ class SLTableModel(DbTableModel):
 
 
 class SLSqlModel(DbSqlModel):
-	def __init__(self, db, sql, parent=None):
-		self.db = db.connector
-		c = self.db._get_cursor()
-
-		t = QTime()
-		t.start()
-		self.db._exec_sql(c, unicode(sql))
-		self._secs = t.elapsed() / 1000.0
-		del t
-
-		data = []
-		header = []
-		if c.description:
-			header = map(lambda x: x[0], c.description)
-			try:
-				data = self.db._fetchall(c)
-			except DbError:
-				# nothing to fetch!
-				data = []
-				header = []
-
-		DbSqlModel.__init__(self, header, data, parent)
-
-		# commit before closing the cursor to make sure that the changes are stored
-		self.db.connection.commit()
-		c.close()
-
-	def secs(self):
-		return self._secs
+	pass
 

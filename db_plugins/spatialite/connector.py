@@ -58,7 +58,7 @@ class SpatiaLiteDBConnector(DBConnector):
 	def _checkGeometryColumnsTable(self):
 		try:
 			c = self.connection.cursor()
-			self._exec_sql(c, u"SELECT CheckSpatialMetaData()")
+			self._execute(c, u"SELECT CheckSpatialMetaData()")
 			self.has_geometry_columns = c.fetchone()[0] == 1
 		except Exception, e:
 			self.has_geometry_columns = False
@@ -68,7 +68,7 @@ class SpatiaLiteDBConnector(DBConnector):
 	
 	def getInfo(self):
 		c = self.connection.cursor()
-		self._exec_sql(c, u"SELECT sqlite_version()")
+		self._execute(c, u"SELECT sqlite_version()")
 		return c.fetchone()
 
 	def getSpatialInfo(self):
@@ -78,7 +78,7 @@ class SpatiaLiteDBConnector(DBConnector):
 			- proj version
 		"""
 		c = self.connection.cursor()
-		self._exec_sql(c, u"SELECT spatialite_version(), geos_version(), proj4_version()")
+		self._execute(c, u"SELECT spatialite_version(), geos_version(), proj4_version()")
 		return c.fetchone()
 
 
@@ -106,7 +106,7 @@ class SpatiaLiteDBConnector(DBConnector):
 		if self.has_geometry_columns:
 			# get the R*Tree tables
 			sql = u"SELECT f_table_name, f_geometry_column FROM geometry_columns WHERE spatial_index_enabled = 1"
-			self._exec_sql(c, sql)		
+			self._execute(c, sql)		
 			for idx_item in c.fetchall():
 				sys_tables.append( 'idx_%s_%s' % idx_item )
 				sys_tables.append( 'idx_%s_%s_node' % idx_item )
@@ -115,7 +115,7 @@ class SpatiaLiteDBConnector(DBConnector):
 
 			
 		sql = u"SELECT name, type = 'view' FROM sqlite_master WHERE type IN ('table', 'view')"
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 
 		for tbl in c.fetchall():
 			if tablenames.count( tbl[0] ) <= 0:
@@ -152,7 +152,7 @@ class SpatiaLiteDBConnector(DBConnector):
 						WHERE m.type in ('table', 'view') 
 						ORDER BY m.name, g.f_geometry_column"""
 
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 
 		items = []
 		for tbl in c.fetchall():
@@ -165,27 +165,27 @@ class SpatiaLiteDBConnector(DBConnector):
 
 	def getTableRowCount(self, table, schema=None):
 		c = self.connection.cursor()
-		self._exec_sql(c, u"SELECT COUNT(*) FROM %s" % self.quoteId(table) )
+		self._execute(c, u"SELECT COUNT(*) FROM %s" % self.quoteId(table) )
 		return c.fetchone()[0]
 
 	def getTableFields(self, table, schema=None):
 		""" return list of columns in table """
 		c = self.connection.cursor()
 		sql = u"PRAGMA table_info(%s)" % (self.quoteId(table))
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 		return c.fetchall()
 
 	def getTableIndexes(self, table, schema=None):
 		""" get info about table's indexes """
 		c = self.connection.cursor()
 		sql = u"PRAGMA index_list(%s)" % (self.quoteId(table))
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 		indexes = c.fetchall()
 
 		for i, idx in enumerate(indexes):
 			num, name, unique = idx
 			sql = u"PRAGMA index_info(%s)" % (self.quoteId(name))
-			self._exec_sql(c, sql)
+			self._execute(c, sql)
 
 			idx = [num, name, unique]
 			cols = []
@@ -202,13 +202,13 @@ class SpatiaLiteDBConnector(DBConnector):
 	def getTableTriggers(self, table, schema=None):
 		c = self.connection.cursor()
 		sql = u"SELECT name, sql FROM sqlite_master WHERE lower(tbl_name) = lower(%s) AND type = 'trigger'" % (self.quoteString(table))
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 		return c.fetchall()
 
 	def deleteTableTrigger(self, trigger, table=None, schema=None):
 		""" delete trigger """
 		sql = u"DROP TRIGGER %s" % self.quoteId(trigger)
-		self._exec_sql_and_commit(sql)
+		self._execute_and_commit(sql)
 
 
 	def getTableEstimatedExtent(self, geom, table, schema=None):
@@ -216,20 +216,20 @@ class SpatiaLiteDBConnector(DBConnector):
 		c = self.connection.cursor()
 		sql = u"""SELECT Min(MbrMinX(%(geom)s)), Min(MbrMinY(%(geom)s)), Max(MbrMaxX(%(geom)s)), Max(MbrMaxY(%(geom)s)) 
 						FROM %(table)s """ % { 'geom' : self.quoteId(geom), 'table' : self.quoteId(table) }
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 		return c.fetchone()
 	
 	def getViewDefinition(self, view, schema=None):
 		""" returns definition of the view """
 		sql = u"SELECT sql FROM sqlite_master WHERE type = 'view' AND name = %s" % self.quoteString(view)
 		c = self.connection.cursor()
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 		return c.fetchone()[0]
 
 	def getSpatialRefInfo(self, srid):
 		sql = u"SELECT ref_sys_name FROM spatial_ref_sys WHERE srid = %s" % self.quoteString(srid)
 		c = self.connection.cursor()
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 		return c.fetchone()[0]
 
 
@@ -247,23 +247,23 @@ class SpatiaLiteDBConnector(DBConnector):
 			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkey)
 		sql += ")"
 
-		self._exec_sql_and_commit(sql)
+		self._execute_and_commit(sql)
 		return True
 
 	def deleteTable(self, table, schema=None):
 		""" delete table from the database """
 		c = self.connection.cursor()
 		sql = u"DROP TABLE %s" % self.quoteId(table)
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 		sql = u"DELETE FROM geometry_columns WHERE lower(f_table_name) = lower(%s)" % self.quoteString(table)
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 		self.connection.commit()
 
 
 	def emptyTable(self, table, schema=None):
 		""" delete all rows from table """
 		sql = u"DELETE FROM %s" % self.quoteId(table)
-		self._exec_sql_and_commit(sql)
+		self._execute_and_commit(sql)
 		
 	def renameTable(self, table, new_table, schema=None):
 		""" rename a table """
@@ -272,12 +272,12 @@ class SpatiaLiteDBConnector(DBConnector):
 		c = self.connection.cursor()
 
 		sql = u"ALTER TABLE %s RENAME TO %s" % (self.quoteId(table), self.quoteId(new_table))
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 		
 		# update geometry_columns
 		if self.has_geometry_columns:
 			sql = u"UPDATE geometry_columns SET f_table_name=%s WHERE f_table_name=%s" % (self.quoteString(new_table), self.quoteString(table))
-			self._exec_sql(c, sql)
+			self._execute(c, sql)
 
 		self.connection.commit()
 
@@ -286,11 +286,11 @@ class SpatiaLiteDBConnector(DBConnector):
 		
 	def createView(self, name, query, schema=None):
 		sql = u"CREATE VIEW %s AS %s" % (self.quoteId(name), query)
-		self._exec_sql_and_commit(sql)
+		self._execute_and_commit(sql)
 	
 	def deleteView(self, name, schema=None):
 		sql = u"DROP VIEW %s" % self.quoteId(name)
-		self._exec_sql_and_commit(sql)
+		self._execute_and_commit(sql)
 	
 	def renameView(self, name, new_name, schema=None):
 		""" rename view """
@@ -308,7 +308,7 @@ class SpatiaLiteDBConnector(DBConnector):
 		]
 
 
-	def _exec_sql(self, cursor, sql):
+	def _execute(self, cursor, sql):
 		try:
 			cursor.execute(unicode(sql))
 		except sqlite.OperationalError, e:
@@ -316,15 +316,15 @@ class SpatiaLiteDBConnector(DBConnector):
 			self.connection.rollback()
 			raise DbError(e, sql)
 		
-	def _exec_sql_and_commit(self, sql):
+	def _execute_and_commit(self, sql):
 		""" tries to execute and commit some action, on error it rolls back the change """
 		c = self.connection.cursor()
-		self._exec_sql(c, sql)
+		self._execute(c, sql)
 		self.connection.commit()
 
 	def _get_cursor(self, name=None):
 		if name:
-			name = unicode(name).encode('ascii', 'replace', '_')
+			name = QString( unicode(name).encode('ascii', 'replace') ).replace( QRegExp("\W"), "_" ).toAscii()
 			self._last_cursor_named_id = 0 if not hasattr(self, '_last_cursor_named_id') else self._last_cursor_named_id + 1
 			return self.connection.cursor( "%s_%d" % (name, self._last_cursor_named_id) )
 		return self.connection.cursor()
@@ -336,4 +336,15 @@ class SpatiaLiteDBConnector(DBConnector):
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self.connection.rollback()
 			raise DbError(e)
+
+	def _commit(self):
+		self.connection.commit()
+
+	def _rollback(self):
+		self.connection.rollback()
+
+	def _get_columns(self, c):
+		if c.description:
+			return map(lambda x: x[0], c.description)
+		return []
 

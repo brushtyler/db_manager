@@ -1,0 +1,15 @@
+DONE:
+- SLManager (replaced at all)
+- PGManager
+    * import/export data (done by drag'n'drop using Import Vector Layer feature)
+- RT_Sql_Layer
+    * load a query as layer into canvas (retrieve unique and geometry for fields)
+
+TODO:
+- PGManager
+    * versioning
+    * GUI to import/export data
+- create table
+- edit table
+- RT_Sql_Layer
+    * query builder and manager

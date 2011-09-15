@@ -119,7 +119,7 @@ class DBManager(QMainWindow):
 			return
 
 		from dlg_sql_window import DlgSqlWindow
-		dlg = DlgSqlWindow(self, db)
+		dlg = DlgSqlWindow(self.iface, db, self)
 		dlg.exec_()
 		self.refreshItem( db.connection() )
 

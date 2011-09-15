@@ -344,15 +344,15 @@ class DBModel(QAbstractItemModel):
 			if isinstance(item, SchemaItem) or isinstance(item, TableItem):
 				flags |= Qt.ItemIsEditable
 
+			if isinstance(item, TableItem):
+				flags |= Qt.ItemIsDragEnabled
+
 			if self.isImportVectorAvail:	# allow to import a vector layer
 				if isinstance(item, ConnectionItem) and item.populated:
 					flags |= Qt.ItemIsDropEnabled
 
 				if isinstance(item, SchemaItem) or isinstance(item, TableItem):
 					flags |= Qt.ItemIsDropEnabled
-
-				if isinstance(item, TableItem):
-					flags |= Qt.ItemIsDragEnabled
 
 		return flags
 	
@@ -469,6 +469,9 @@ class DBModel(QAbstractItemModel):
 		if action == Qt.IgnoreAction:
 			return True
 
+		if not self.isImportVectorAvail:
+			return False
+
 		if not data.hasFormat(self.QGIS_URI_MIME):
 			return False
 
@@ -478,12 +481,11 @@ class DBModel(QAbstractItemModel):
 		added = 0
 		while not stream.atEnd():
 			mimeUri = stream.readQString()
-			print ">>>mimeUri", mimeUri
 
 			parts = QStringList() << unicode(mimeUri).split(":", 4)
 			if len(parts) != 4:
 				# invalid qgis mime uri
-				print ">>>invalid mimeUri: parts", parts.join( "," )
+				#print ">>>invalid mimeUri"
 				continue
 
 			layerType, providerKey, layerName, uriString = parts
@@ -493,7 +495,7 @@ class DBModel(QAbstractItemModel):
 			else:
 				inLayer = qgis.core.QgsVectorLayer(uriString, layerName, providerKey)
 			if not inLayer.isValid():
-				print ">>>invalid inLayer"
+				#print ">>>invalid inLayer"
 				# invalid layer
 				continue
 
@@ -506,8 +508,6 @@ class DBModel(QAbstractItemModel):
 				outSchema = outObj
 			elif isinstance(outItem, TableItem):
 				outSchema = outObj.schema()
-
-			print ">>>out db",outDb, " schema",outSchema
 
 			# toIndex will point to the parent item of the new table
 			toIndex = parent
@@ -522,7 +522,6 @@ class DBModel(QAbstractItemModel):
 
 				if providerKey == 'ogr':
 					# TODO: ask for pk and geom field name
-					pkCol = "pk"
 					geomCol = "the_geom" if inLayer.hasGeometryType() else QString()
 
 				elif providerKey in ['postgres', 'spatialite']:
@@ -539,7 +538,6 @@ class DBModel(QAbstractItemModel):
 				params.append( outDb.dbplugin().providerName() )	# output providerKey
 				params.append( None )	# destination CRS
 
-				print ">>>emit import!"
 				added = added + 1
 				self.emit( SIGNAL("importVector"), params, toIndex )
 
@@ -547,10 +545,11 @@ class DBModel(QAbstractItemModel):
 
 
 	def importVector(self, params, parent):
+		if not self.isImportVectorAvail:
+			return False
+
 		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
-		print ">>>before import!"
 		ret, errMsg = qgis.core.QgsVectorLayerImport.importLayer( *params )
-		print ">>>after import!"
 		QApplication.restoreOverrideCursor()
 		if ret != 0:
 			QMessageBox.warning( None, "Error [%d]" % ret, errMsg )
