@@ -60,7 +60,7 @@ class PGTableModel(DbTableModel):
 		# close cursor and save memory
 		self.cursor.close()
 		del self.cursor
-		print "PGTableModel.__del__"
+		pass	#print "PGTableModel.__del__"
 
 	def fetchMoreData(self, row_start):
 		import psycopg2

@@ -20,10 +20,13 @@ email                : brush.tyler@gmail.com
  ***************************************************************************/
 """
 
+# this will disable the dbplugin if the connector raise an ImportError
+from .connector import SpatiaLiteDBConnector
+
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..plugin import DBPlugin, Database, Table, VectorTable, TableField, TableConstraint, TableIndex, TableTrigger
+from ..plugin import DBPlugin, Database, Table, VectorTable, RasterTable, TableField, TableConstraint, TableIndex, TableTrigger
 try:
 	from . import resources_rc
 except ImportError:
@@ -81,7 +84,6 @@ class SLDatabase(Database):
 		Database.__init__(self, connection, uri)
 
 	def connectorsFactory(self, uri):
-		from .connector import SpatiaLiteDBConnector
 		return SpatiaLiteDBConnector(uri)
 
 
@@ -90,6 +92,9 @@ class SLDatabase(Database):
 
 	def vectorTablesFactory(self, row, db, schema=None):
 		return SLVectorTable(row, db, schema)
+
+	def rasterTablesFactory(self, row, db, schema=None):
+		return SLRasterTable(row, db, schema)
 
 
 	def info(self):
@@ -133,6 +138,33 @@ class SLVectorTable(SLTable, VectorTable):
 		pk = self.getValidQGisUniqueFields(True)
 		uri.setDataSource('', self.geomTableName, self.geomColumn, QString(), pk.name if pk else QString())
 		return uri
+
+class SLRasterTable(SLTable, RasterTable):
+	def __init__(self, row, db, schema=None):
+		SLTable.__init__(self, row[:-3], db, schema)
+		RasterTable.__init__(self, db, schema)
+		self.prefixName, self.geomColumn, self.srid = row[-3:]
+		self.geomType = 'RASTER'
+
+	#def info(self):
+		#from .info_model import SLRasterTableInfo
+		#return SLRasterTableInfo(self)
+
+	def gdalUri(self):
+		uri = self.database().uri()
+		gdalUri = u'RASTERLITE:%s,table=%s' % (uri.database(), self.prefixName)
+		return QString( gdalUri )
+
+	def mimeUri(self):
+		uri = u"raster:gdal:%s:%s" % (self.name, self.gdalUri())
+		return QString( uri )
+	
+	def toMapLayer(self):
+		from qgis.core import QgsRasterLayer 
+		rl = QgsRasterLayer(self.gdalUri(), self.name)
+		if rl.isValid():
+			rl.setContrastEnhancementAlgorithm("StretchToMinimumMaximum")
+		return rl
 
 
 class SLTableField(TableField):

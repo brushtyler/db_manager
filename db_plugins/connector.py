@@ -29,7 +29,7 @@ class DBConnector:
 		self._uri = uri
 
 	def __del__(self):
-		print "DBConnector.__del__", self._uri.uri()
+		pass	#print "DBConnector.__del__", self._uri.connectionInfo()
 		if self.connection != None: 
 			self.connection.close()
 		self.connection = None

@@ -45,15 +45,22 @@ class SpatiaLiteDBConnector(DBConnector):
 			raise ConnectionError(e)
 
 		self._checkSpatial()
+		self._checkRaster()
 		self._checkGeometryColumnsTable()
+		self._checkRastersTable()
 
 	def _connectionInfo(self):
-		return u'%s' % self.dbname
+		return unicode(self.dbname)
 	
 	def _checkSpatial(self):
-		""" check if is a valid spatialite db """
+		""" check if it's a valid spatialite db """
 		self.has_spatial = self._checkGeometryColumnsTable()
 		return self.has_spatial
+
+	def _checkRaster(self):
+		""" check if it's a rasterite db """
+		self.has_raster = self._checkRastersTable()
+		return self.has_raster
 
 	def _checkGeometryColumnsTable(self):
 		try:
@@ -65,6 +72,13 @@ class SpatiaLiteDBConnector(DBConnector):
 
 		self.has_geometry_columns_access = self.has_geometry_columns
 		return self.has_geometry_columns
+
+	def _checkRastersTable(self):
+		c = self.connection.cursor()
+		sql = u"SELECT count(*) = 3 FROM sqlite_master WHERE name IN ('layer_params', 'layer_statistics', 'raster_pyramids')"
+		self._execute(c, sql)
+		ret = c.fetchone()
+		return ret and ret[0]
 	
 	def getInfo(self):
 		c = self.connection.cursor()
@@ -77,8 +91,15 @@ class SpatiaLiteDBConnector(DBConnector):
 			- geos version
 			- proj version
 		"""
+		if not self.has_spatial:
+			return
+
 		c = self.connection.cursor()
-		self._execute(c, u"SELECT spatialite_version(), geos_version(), proj4_version()")
+		try:
+			self._execute(c, u"SELECT spatialite_version(), geos_version(), proj4_version()")
+		except DbError:
+			return
+
 		return c.fetchone()
 
 
@@ -95,10 +116,10 @@ class SpatiaLiteDBConnector(DBConnector):
 			tablenames.append( tbl[1] )
 			items.append( tbl )
 
-		#rasters = self.getRasterTables(schema)
-		#for tbl in rasters:
-		#	tablenames.append( tbl[1] )
-		#	items.append( tbl )
+		rasters = self.getRasterTables(schema)
+		for tbl in rasters:
+			tablenames.append( tbl[1] )
+			items.append( tbl )
 
 		c = self.connection.cursor()
 
@@ -162,6 +183,41 @@ class SpatiaLiteDBConnector(DBConnector):
 
 		return items
 
+
+	def getRasterTables(self, schema=None):
+		""" get list of table with a geometry column
+			it returns:
+				name (table name)
+				type = 'view' (is a view?)
+				geometry_column:
+					f_table_name (the table name in geometry_columns may be in a wrong case, use this to load the layer)
+					f_geometry_column
+					type 
+					coord_dimension 
+					srid
+		"""
+					
+		if not self.has_geometry_columns or not self.has_raster:
+			return []
+
+		c = self.connection.cursor()
+			
+		# get geometry info from geometry_columns if exists
+		sql = u"""SELECT r.table_name||'_rasters', m.type = 'view', r.table_name, r.geometry_column, g.srid
+						FROM sqlite_master AS m JOIN geometry_columns AS g ON lower(m.name) = lower(g.f_table_name) 
+						JOIN layer_params AS r ON REPLACE(m.name, '_metadata', '') = r.table_name
+						WHERE m.type in ('table', 'view') AND m.name = r.table_name||'_metadata'
+						ORDER BY r.table_name"""
+
+		self._execute(c, sql)
+
+		items = []
+		for i, tbl in enumerate(c.fetchall()):
+			item = list(tbl)
+			item.insert(0, Table.RasterType)
+			items.append( item )
+			
+		return items
 
 	def getTableRowCount(self, table, schema=None):
 		c = self.connection.cursor()
@@ -297,7 +353,8 @@ class SpatiaLiteDBConnector(DBConnector):
 		self.renameTable(name, new_name)
 
 	def hasCustomQuerySupport(self):
-		return True
+		from qgis.core import QGis
+		return QGis.QGIS_VERSION[0:3] >= "1.6"
 
 	def fieldTypes(self):
 		return [

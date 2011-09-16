@@ -51,6 +51,9 @@ class DatabaseInfo:
 		ret = []
 
 		info = self.db.connector.getSpatialInfo()
+		if info == None:
+			return
+
 		tbl = [
 			("Library:", info[0]), 
 			("Scripts:", info[1]),

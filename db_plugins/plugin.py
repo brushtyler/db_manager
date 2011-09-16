@@ -62,7 +62,7 @@ class DBPlugin(QObject):
 		self.db = None
 
 	def __del__(self):
-		print "DBPlugin.__del__", self.connName
+		pass	#print "DBPlugin.__del__", self.connName
 
 	def connectionName(self):
 		return self.connName
@@ -149,8 +149,8 @@ class Database(DbItemObject):
 		return None
 
 	def __del__(self):
-		print "Database.__del__", self
-		#self.connector = None
+		self.connector = None
+		pass	#print "Database.__del__", self
 
 	def connection(self):
 		return self.parent()
@@ -259,7 +259,7 @@ class Schema(DbItemObject):
 		self.tableCount = 0
 
 	def __del__(self):
-		print "Schema.__del__", self
+		pass	#print "Schema.__del__", self
 
 	def database(self):
 		return self.parent()
@@ -292,7 +292,7 @@ class Table(DbItemObject):
 		self._fields = self._indexes = self._constraints = self._triggers = self._rules = None
 
 	def __del__(self):
-		print "Table.__del__", self
+		pass	#print "Table.__del__", self
 
 	def database(self):
 		return self.parent()
@@ -497,9 +497,8 @@ class RasterTable(Table):
 		self.geomColumn = self.geomType = self.pixelSizeX = self.pixelSizeY = self.pixelType = self.isExternal = self.srid = None
 
 	def info(self):
-		#from .info_model import RasterTableInfo
-		#return RasterTableInfo(self)
-		pass
+		from .info_model import RasterTableInfo
+		return RasterTableInfo(self)
 
 
 class TableSubItemObject(QObject):

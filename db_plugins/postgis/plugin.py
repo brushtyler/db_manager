@@ -20,10 +20,13 @@ email                : brush.tyler@gmail.com
  ***************************************************************************/
 """
 
+# this will disable the dbplugin if the connector raise an ImportError
+from .connector import PostGisDBConnector
+
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..plugin import DBPlugin, Database, Schema, Table, VectorTable, RasterTable, TableField, TableConstraint, TableIndex, TableTrigger, TableRule
+from ..plugin import ConnectionError, DBPlugin, Database, Schema, Table, VectorTable, RasterTable, TableField, TableConstraint, TableIndex, TableTrigger, TableRule
 try:
 	from . import resources_rc
 except ImportError:
@@ -67,23 +70,62 @@ class PostGisDBPlugin(DBPlugin):
 
 		if not settings.contains( "database" ): # non-existent entry?
 			raise InvalidDataException( 'there is no defined database connection "%s".' % conn_name )
+
+		from qgis.core import QgsDataSourceURI
+		uri = QgsDataSourceURI()
 	
-		get_value_str = lambda x: unicode(settings.value(x).toString())
+		get_value_str = lambda x: settings.value(x).toString()
 		host, port, database, username, password = map(get_value_str, ["host", "port", "database", "username", "password"])
 
 		# qgis1.5 use 'savePassword' instead of 'save' setting
-		if not ( settings.value("save").toBool() or settings.value("savePassword").toBool() ):
-			#dlg = qgis.gui.QgsCredentialDialog(parent)
-			#(ok, username, password) = dlg.request(selected)
-			(password, ok) = QInputDialog.getText(parent, "Enter password", 'Enter password for connection "%s":' % conn_name, QLineEdit.Password)
-			if not ok: return False
+		savedPassword = settings.value("save", False).toBool() or settings.value("savePassword", False).toBool()
+
+		useEstimatedMetadata = settings.value("estimatedMetadata", False).toBool()
+		sslmode = settings.value("sslmode", QgsDataSourceURI.SSLprefer).toInt()[0]
 
 		settings.endGroup()
 
-		import qgis.core
-		uri = qgis.core.QgsDataSourceURI()
-		uri.setConnection(host, port, database, username, password)
-		return DBPlugin.connect(self, uri)
+		uri.setConnection(host, port, database, username, password, sslmode)
+		uri.setUseEstimatedMetadata(useEstimatedMetadata)
+
+		err = QString()
+		try:
+			return DBPlugin.connect(self, uri)
+		except ConnectionError, e:
+			err = QString( str(e) )
+
+		hasCredentialDlg = True
+		try:
+			from qgis.gui import QgsCredentials
+		except ImportError:	# no credential dialog
+			hasCredentialDlg = False
+
+		# ask for valid credentials
+		max_attempts = 3
+		for i in range(max_attempts):
+			if hasCredentialDlg:
+				(ok, username, password) = QgsCredentials.instance().get(uri.connectionInfo(), username, password, err)
+			else:
+				(password, ok) = QInputDialog.getText(parent, u"Enter password", u'Enter password for connection "%s":' % conn_name, QLineEdit.Password)
+
+			if not ok:
+				return False
+
+			uri.setConnection(host, port, database, username, password, sslmode)
+
+			try:
+				DBPlugin.connect(self, uri)
+			except ConnectionError, e:
+				if i == max_attempts-1:	# failed the last attempt
+					raise e
+				err = QString( str(e) )
+				continue
+
+			if hasCredentialDlg:
+				QgsCredentials.instance().put(uri.connectionInfo(), username, password)
+			return True
+
+		return False
 
 
 class PGDatabase(Database):
@@ -91,7 +133,6 @@ class PGDatabase(Database):
 		Database.__init__(self, connection, uri)
 
 	def connectorsFactory(self, uri):
-		from .connector import PostGisDBConnector
 		return PostGisDBConnector(uri)
 
 

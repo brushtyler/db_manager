@@ -55,14 +55,7 @@ class PostGisDBConnector(DBConnector):
 		self._checkRasterColumnsTable()
 
 	def _connectionInfo(self):
-		conn_str = u''
-		if self.host:   conn_str += "host='%s' "     % self.host
-		if self.port:   conn_str += "port=%s "       % self.port
-		if self.dbname: conn_str += "dbname='%s' "   % self.dbname
-		if self.user:   conn_str += "user='%s' "     % self.user
-		if self.passwd: conn_str += "password='%s' " % self.passwd
-		return conn_str
-
+		return unicode(self._uri.connectionInfo())
 
 	def _checkSpatial(self):
 		""" check whether postgis_version is present in catalog """
@@ -121,8 +114,15 @@ class PostGisDBConnector(DBConnector):
 			- proj version
 			- whether uses stats
 		"""
+		if not self.has_spatial:
+			return
+
 		c = self.connection.cursor()
-		self._execute(c, u"SELECT postgis_lib_version(), postgis_scripts_installed(), postgis_scripts_released(), postgis_geos_version(), postgis_proj_version(), postgis_uses_stats()")
+		try:
+			self._execute(c, u"SELECT postgis_lib_version(), postgis_scripts_installed(), postgis_scripts_released(), postgis_geos_version(), postgis_proj_version(), postgis_uses_stats()")
+		except DbError:
+			return
+
 		return c.fetchone()
 
 
@@ -209,7 +209,7 @@ class PostGisDBConnector(DBConnector):
 				pages
 				geometry_column:
 					f_geometry_column (or pg_attribute.attname, the geometry column name)
-					type (or pg_attribute.atttypid::regtype::text, the geometry column type name)
+					type (or pg_attribute.atttypid::regtype, the geometry column type name)
 					coord_dimension 
 					srid
 		"""
@@ -239,7 +239,7 @@ class PostGisDBConnector(DBConnector):
 		sql = u"""SELECT 
 						cla.relname, nsp.nspname, cla.relkind = 'v', pg_get_userbyid(relowner), cla.reltuples, cla.relpages, 
 						CASE WHEN geo.f_geometry_column IS NOT NULL THEN geo.f_geometry_column ELSE att.attname END, 
-						CASE WHEN geo.type IS NOT NULL THEN geo.type ELSE att.atttypid::regtype::text END, 
+						CASE WHEN geo.type IS NOT NULL THEN geo.type ELSE textin(regtypeout(att.atttypid::regtype)) END, 
 						geo.coord_dimension, geo.srid
 
 					FROM pg_class AS cla 
@@ -279,7 +279,7 @@ class PostGisDBConnector(DBConnector):
 				pages
 				raster_column:
 					r_column (or pg_attribute.attname, the raster column name)
-					pixel type (or pg_attribute.atttypid::regtype::text, the raster column type name)
+					pixel type
 					block size
 					internal or external
 					srid
@@ -627,7 +627,8 @@ class PostGisDBConnector(DBConnector):
 
 
 	def hasCustomQuerySupport(self):
-		return True
+		from qgis.core import QGis
+		return QGis.QGIS_VERSION[0:3] >= "1.5"
 
 	def runVacuumAnalyze(self, table, schema=None):
 		""" run vacuum analyze on a table """
