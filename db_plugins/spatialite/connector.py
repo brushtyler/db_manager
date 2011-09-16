@@ -190,14 +190,14 @@ class SpatiaLiteDBConnector(DBConnector):
 				name (table name)
 				type = 'view' (is a view?)
 				geometry_column:
-					f_table_name (the table name in geometry_columns may be in a wrong case, use this to load the layer)
-					f_geometry_column
-					type 
-					coord_dimension 
+					r.table_name (the prefix table name, use this to load the layer)
+					r.geometry_column
 					srid
 		"""
 					
-		if not self.has_geometry_columns or not self.has_raster:
+		if not self.has_geometry_columns:
+			return []
+		if not self.has_raster:
 			return []
 
 		c = self.connection.cursor()
@@ -270,9 +270,17 @@ class SpatiaLiteDBConnector(DBConnector):
 	def getTableEstimatedExtent(self, geom, table, schema=None):
 		""" find out estimated extent (from the statistics) """
 		c = self.connection.cursor()
+
+		if self.isRasterTable(table, schema):
+			table = QString(table).replace('_rasters', '_metadata')
+			geom = u'geometry'
+
 		sql = u"""SELECT Min(MbrMinX(%(geom)s)), Min(MbrMinY(%(geom)s)), Max(MbrMaxX(%(geom)s)), Max(MbrMaxY(%(geom)s)) 
 						FROM %(table)s """ % { 'geom' : self.quoteId(geom), 'table' : self.quoteId(table) }
-		self._execute(c, sql)
+		try:
+			self._execute(c, sql)
+		except DbError, e:
+			return
 		return c.fetchone()
 	
 	def getViewDefinition(self, view, schema=None):
@@ -306,8 +314,33 @@ class SpatiaLiteDBConnector(DBConnector):
 		self._execute_and_commit(sql)
 		return True
 
+	def isVectorTable(self, table, schema=None):
+		if self.has_geometry_columns:
+			c = self.connection.cursor()
+			sql = u"SELECT count(*) FROM geometry_columns WHERE f_table_name = %s" % self.quoteString(table)
+			self._execute(c, sql)
+			return c.fetchone()[0] > 0
+		return True
+
+	def isRasterTable(self, table, schema=None):
+		if self.has_geometry_columns and self.has_raster:
+			if not QString(table).endsWith( "_rasters" ):
+				return False
+
+			c = self.connection.cursor()
+			sql = u"""SELECT count(*) 
+					FROM layer_params AS r JOIN geometry_columns AS g 
+						ON r.table_name||'_metadata' = g.f_table_name
+					WHERE r.table_name = REPLACE(%s, '_rasters', '')""" % self.quoteString(table)
+			self._execute(c, sql)
+			return c.fetchone()[0] > 0
+		return False
+
 	def deleteTable(self, table, schema=None):
 		""" delete table from the database """
+		if self.isRasterTable(table, schema):
+			return False
+
 		c = self.connection.cursor()
 		sql = u"DROP TABLE %s" % self.quoteId(table)
 		self._execute(c, sql)
@@ -318,6 +351,9 @@ class SpatiaLiteDBConnector(DBConnector):
 
 	def emptyTable(self, table, schema=None):
 		""" delete all rows from table """
+		if self.isRasterTable(table, schema):
+			return False
+
 		sql = u"DELETE FROM %s" % self.quoteId(table)
 		self._execute_and_commit(sql)
 		
@@ -325,6 +361,10 @@ class SpatiaLiteDBConnector(DBConnector):
 		""" rename a table """
 		if new_table == table:
 			return
+
+		if self.isRasterTable(table, schema):
+			return False
+
 		c = self.connection.cursor()
 
 		sql = u"ALTER TABLE %s RENAME TO %s" % (self.quoteId(table), self.quoteId(new_table))
@@ -338,7 +378,7 @@ class SpatiaLiteDBConnector(DBConnector):
 		self.connection.commit()
 
 	def moveTable(self, table, new_table, schema=None, new_schema=None):
-		self.renameTable(table, new_table)
+		return self.renameTable(table, new_table)
 		
 	def createView(self, name, query, schema=None):
 		sql = u"CREATE VIEW %s AS %s" % (self.quoteId(name), query)
@@ -347,10 +387,11 @@ class SpatiaLiteDBConnector(DBConnector):
 	def deleteView(self, name, schema=None):
 		sql = u"DROP VIEW %s" % self.quoteId(name)
 		self._execute_and_commit(sql)
+		return True
 	
 	def renameView(self, name, new_name, schema=None):
 		""" rename view """
-		self.renameTable(name, new_name)
+		return self.renameTable(name, new_name)
 
 	def hasCustomQuerySupport(self):
 		from qgis.core import QGis

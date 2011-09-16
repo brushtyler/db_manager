@@ -268,8 +268,9 @@ class Schema(DbItemObject):
 		return self.parent().tables(self)
 
 	def delete(self):
-		self.database().connector.deleteSchema(self.name)
-		self.emit( SIGNAL('deleted') )
+		ret = self.database().connector.deleteSchema(self.name)
+		if ret != False:
+			self.emit( SIGNAL('deleted') )
 
 	def info(self):
 		from .info_model import SchemaInfo
@@ -309,15 +310,17 @@ class Table(DbItemObject):
 
 	def delete(self):
 		if self.isView:
-			self.database().connector.deleteView(self.name, self.schemaName())
+			ret = self.database().connector.deleteView(self.name, self.schemaName())
 		else:
-			self.database().connector.deleteTable(self.name, self.schemaName())
-		self.emit( SIGNAL('deleted') )
+			ret = self.database().connector.deleteTable(self.name, self.schemaName())
+		if ret != False:
+			self.emit( SIGNAL('deleted') )
 
 	def rename(self, new_name):
-		self.database().connector.renameTable(self.name, new_name, self.schemaName())
-		self.name = new_name
-		self.emit( SIGNAL('changed') )
+		ret = self.database().connector.renameTable(self.name, new_name, self.schemaName())
+		if ret != False:
+			self.name = new_name
+			self.emit( SIGNAL('changed') )
 
 	def empty(self):
 		self.connector.emptyTable(item.name, item.schemaName())

@@ -429,7 +429,7 @@ class RasterTableInfo(TableInfo):
 
 		# estimated extent
 		if not self.table.isView:
-			extent = self.table.database().connector.getTableEstimatedExtent("st_convexhull("+self.table.geomColumn+")", self.table.name, self.table.schema().name if self.table.schema() else None)
+			extent = self.table.database().connector.getTableEstimatedExtent(self.table.geomColumn, self.table.name, self.table.schemaName())
 			if extent != None and extent[0] != None:
 				extent = '%.5f, %.5f - %.5f, %.5f' % extent
 			else:
@@ -438,11 +438,7 @@ class RasterTableInfo(TableInfo):
 
 		ret.append( HtmlTable( tbl ) )
 
-		# is there an entry in geometry_columns?
-		if self.table.geomType.lower() == 'geometry':
-			ret.append( HtmlParagraph( u"<warning> There isn't entry in geometry_columns!" ) )
-
-		# find out whether the geometry column has spatial index on it
+		# find out whether the raster column has spatial index on it
 		if not self.table.isView:
 			has_spatial_index = False
 			for fld in self.table.fields():

@@ -444,15 +444,19 @@ class PostGisDBConnector(DBConnector):
 
 	def getTableEstimatedExtent(self, geom, table, schema=None):
 		""" find out estimated extent (from the statistics) """
-		try:
-			c = self.connection.cursor()
-			schema_part = u"%s, " % self.quoteString(schema) if schema is not None else ""
+		c = self.connection.cursor()
+
+		schema_part = u"%s, " % self.quoteString(schema) if schema is not None else ""
+		if self.isRasterTable(table, schema):
+			extent = u"estimated_extent(%s,%s,st_convexhull(%s))" % (schema_part, self.quoteString(table), self.quoteString(geom))
+		else:
 			extent = u"estimated_extent(%s,%s,%s)" % (schema_part, self.quoteString(table), self.quoteString(geom))
-			sql = u"""SELECT xmin(%(ext)s), ymin(%(ext)s), xmax(%(ext)s), ymax(%(ext)s) """ % { 'ext' : extent }
+		sql = u"""SELECT xmin(%(ext)s), ymin(%(ext)s), xmax(%(ext)s), ymax(%(ext)s) """ % { 'ext' : extent }
+		try:
 			self._execute(c, sql)
-			return c.fetchone()
 		except DbError, e:
 			return
+		return c.fetchone()
 	
 	def getViewDefinition(self, view, schema=None):
 		""" returns definition of the view """
