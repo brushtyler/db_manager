@@ -409,7 +409,7 @@ class SpatiaLiteDBConnector(DBConnector):
 	def _execute(self, cursor, sql):
 		try:
 			cursor.execute(unicode(sql))
-		except sqlite.OperationalError, e:
+		except (sqlite.OperationalError, sqlite.DatabaseError), e:
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self.connection.rollback()
 			raise DbError(e, sql)

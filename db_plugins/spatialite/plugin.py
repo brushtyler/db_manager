@@ -69,7 +69,7 @@ class SpatiaLiteDBPlugin(DBPlugin):
 		settings.beginGroup( u"/%s/%s" % (self.connectionSettingsKey(), conn_name) )
 
 		if not settings.contains( "sqlitepath" ): # non-existent entry?
-			raise InvalidDataException( 'there is no defined database connection "%s".' % conn_name )
+			raise InvalidDataException( u'there is no defined database connection "%s".' % conn_name )
 
 		database = unicode(settings.value("sqlitepath").toString())
 

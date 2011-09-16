@@ -26,33 +26,38 @@ from PyQt4.QtGui import *
 from ..db_plugins import createDbPlugin
 from .html_elems import HtmlParagraph, HtmlTable
 
-class InvalidDataException(Exception):
+class BaseException(Exception):
 	def __init__(self, msg):
-		self.msg = unicode( msg )
+		try:
+			self.msg = unicode( msg )
+		except UnicodeDecodeError:
+			self.msg = unicode( msg, 'utf-8' )
 		Exception(self, self.msg)
 
-	def __str__(self):
-		return self.msg.encode('utf-8')
-
-class ConnectionError(Exception):
-	def __init__(self, msg):
-		self.msg = unicode( msg )
-		Exception(self, self.msg)
+	def __unicode__(self):
+		return self.msg
 
 	def __str__(self):
-		return self.msg.encode('utf-8')
+		return unicode(self).encode('utf-8')
 
-class DbError(Exception):
-	def __init__(self, errormsg, query=None):
-		self.msg = unicode( errormsg )
+class InvalidDataException(BaseException):
+	pass
+
+class ConnectionError(BaseException):
+	def __init__(self, ex):
+		BaseException.__init__(self, ex.args[0])
+
+class DbError(BaseException):
+	def __init__(self, ex, query=None):
+		BaseException.__init__(self, ex.args[0])
 		self.query = unicode( query ) if query else None
-		Exception(self, self.msg)
 
-	def __str__(self):
+	def __unicode__(self):
 		msg = self.msg
 		if self.query:
 			msg += u"\nQuery:\n%s" % self.query
-		return msg.encode('utf-8')
+		return msg
+
 
 
 class DBPlugin(QObject):

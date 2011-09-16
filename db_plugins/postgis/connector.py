@@ -45,7 +45,7 @@ class PostGisDBConnector(DBConnector):
 			self.dbname = self.user
 		
 		try:
-			self.connection = psycopg2.connect( self._connectionInfo() )
+			self.connection = psycopg2.connect( self._connectionInfo().encode('utf-8') )
 		except psycopg2.OperationalError, e:
 			raise ConnectionError(e)
 		
