@@ -44,8 +44,7 @@ class InvalidDataException(BaseException):
 	pass
 
 class ConnectionError(BaseException):
-	def __init__(self, ex):
-		BaseException.__init__(self, ex.args[0])
+	pass
 
 class DbError(BaseException):
 	def __init__(self, ex, query=None):

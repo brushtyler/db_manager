@@ -27,17 +27,20 @@ from PyQt4.QtGui import *
 class BaseTableModel(QAbstractTableModel):
 	def __init__(self, header=None, data=None, parent=None):
 		QAbstractTableModel.__init__(self, parent)
-		self.header = header if header else []
+		self._header = header if header else []
 		self.resdata = data if data else []
 
 	def getData(self, row, col):
 		return self.resdata[row][col]
+
+	def columnNames(self):
+		return list(self._header)
 		
 	def rowCount(self, parent=None):
 		return len(self.resdata)
 	
 	def columnCount(self, parent):
-		return len(self.header)
+		return len(self._header)
 	
 	def data(self, index, role):
 		if role != Qt.DisplayRole and role != Qt.FontRole:
@@ -66,7 +69,7 @@ class BaseTableModel(QAbstractTableModel):
 			return QVariant(section+1)
 		else:
 			# header for a column
-			return QVariant(self.header[section])
+			return QVariant(self._header[section])
 
 
 class DbTableModel(BaseTableModel):

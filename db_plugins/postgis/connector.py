@@ -47,7 +47,7 @@ class PostGisDBConnector(DBConnector):
 		try:
 			self.connection = psycopg2.connect( self._connectionInfo().encode('utf-8') )
 		except psycopg2.OperationalError, e:
-			raise ConnectionError(e)
+			raise ConnectionError( e.args[0] )
 		
 		self._checkSpatial()
 		self._checkRaster()
@@ -162,18 +162,28 @@ class PostGisDBConnector(DBConnector):
 		tablenames = []
 		items = []
 
+		sys_tables = [ "spatial_ref_sys", "geography_columns", "geometry_columns", 
+				"raster_columns", "raster_overviews" ]
+
 		vectors = self.getVectorTables(schema)
 		for tbl in vectors:
+			if tbl[1] in sys_tables and tbl[2] in ['', 'public']:
+				continue
 			tablenames.append( (tbl[2], tbl[1]) )
 			items.append( tbl )
 
 		rasters = self.getRasterTables(schema)
 		for tbl in rasters:
+			if tbl[1] in sys_tables and tbl[2] in ['', 'public']:
+				continue
 			tablenames.append( (tbl[2], tbl[1]) )
 			items.append( tbl )
 
 
 		c = self.connection.cursor()
+
+		sys_tables = [ "spatial_ref_sys", "geography_columns", "geometry_columns", 
+				"raster_columns", "raster_overviews" ]
 		
 		if schema:
 			schema_where = u" AND nspname = %s " % self.quoteString(schema)
@@ -189,8 +199,7 @@ class PostGisDBConnector(DBConnector):
 		self._execute(c, sql)
 
 		for tbl in c.fetchall():
-			tblname = (tbl[1], tbl[0])
-			if tablenames.count( tblname ) <= 0:
+			if tablenames.count( (tbl[1], tbl[0]) ) <= 0:
 				item = list(tbl)
 				item.insert(0, Table.TableType)
 				items.append( item )
@@ -216,10 +225,6 @@ class PostGisDBConnector(DBConnector):
 
 		if not self.has_spatial:
 			return []
-
-		# do not display sys_tables as geometry tables
-		sys_tables = []
-		if self.has_raster: sys_tables.append('raster_columns')
 
 		c = self.connection.cursor()
 		
@@ -260,8 +265,6 @@ class PostGisDBConnector(DBConnector):
 
 		items = []
 		for i, tbl in enumerate(c.fetchall()):
-			if tbl[0] in sys_tables and tbl[1] in ['', 'public']:
-				continue
 			item = list(tbl)
 			item.insert(0, Table.VectorType)
 			items.append( item )

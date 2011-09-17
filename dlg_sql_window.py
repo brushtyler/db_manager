@@ -1,5 +1,27 @@
 # -*- coding: utf-8 -*-
 
+"""
+/***************************************************************************
+Name                 : DB Manager
+Description          : Database manager plugin for QuantumGIS
+Date                 : May 23, 2011
+copyright            : (C) 2011 by Giuseppe Sucameli
+email                : brush.tyler@gmail.com
+
+The content of this file is based on 
+PostGIS Manager by Martin Dobias
+ ***************************************************************************/
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ ***************************************************************************/
+"""
+
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
@@ -7,6 +29,8 @@ from .ui.DlgSqlWindow_ui import Ui_DlgSqlWindow
 
 from .db_plugins.plugin import DbError
 from .dlg_db_error import DlgDbError
+
+from highlighter import SqlHighlighter
 
 class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 
@@ -20,6 +44,9 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 
 		settings = QSettings()
 		self.restoreGeometry(settings.value("/DB_Manager/sqlWindow/geometry").toByteArray())
+
+		self.editSql.setAcceptRichText(False)
+		SqlHighlighter(self.editSql).load(self.db)
 		
 		self.connect(self.btnExecute, SIGNAL("clicked()"), self.executeSql)
 		self.connect(self.btnClear, SIGNAL("clicked()"), self.clearSql)
@@ -77,7 +104,7 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 			DlgDbError.showError(e, self)
 			return
 
-		cols = self.viewResult.model().header
+		cols = self.viewResult.model().columnNames()
 		cols.sort()
 		self.uniqueCombo.addItems( cols )
 		self.geomCombo.addItems( cols )

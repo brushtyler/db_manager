@@ -42,7 +42,7 @@ class SpatiaLiteDBConnector(DBConnector):
 		try:
 			self.connection = sqlite.connect( self._connectionInfo() )
 		except sqlite.OperationalError, e:
-			raise ConnectionError(e)
+			raise ConnectionError( e.args[0] )
 
 		self._checkSpatial()
 		self._checkRaster()
@@ -111,19 +111,29 @@ class SpatiaLiteDBConnector(DBConnector):
 		tablenames = []
 		items = []
 
+		sys_tables = [ "geom_cols_ref_sys", "geometry_columns", "geometry_columns_auth", 
+				"views_geometry_columns", "virts_geometry_columns", "spatial_ref_sys", 
+				"sqlite_sequence", #"tableprefix_metadata", "tableprefix_rasters", 
+				"layer_params","layer_statistics", "layer_sub_classes", "layer_table_layout", 
+				"pattern_bitmaps","symbol_bitmaps", "project_defs", "raster_pyramids", 
+				"sqlite_stat1", "sqlite_stat2", "spatialite_history" ]
+
 		vectors = self.getVectorTables(schema)
 		for tbl in vectors:
+			if tbl[1] in sys_tables:
+				continue
 			tablenames.append( tbl[1] )
 			items.append( tbl )
 
 		rasters = self.getRasterTables(schema)
 		for tbl in rasters:
+			if tbl[1] in sys_tables:
+				continue
 			tablenames.append( tbl[1] )
 			items.append( tbl )
 
 		c = self.connection.cursor()
 
-		sys_tables = ['sqlite_stat1']
 		if self.has_geometry_columns:
 			# get the R*Tree tables
 			sql = u"SELECT f_table_name, f_geometry_column FROM geometry_columns WHERE spatial_index_enabled = 1"
@@ -144,7 +154,7 @@ class SpatiaLiteDBConnector(DBConnector):
 				item.insert(0, Table.TableType)
 				items.append( item )
 
-		for tbl in items:
+		for i, tbl in enumerate(items):
 			tbl.insert(3, tbl[1] in sys_tables)
 
 		return sorted( items, cmp=lambda x,y: cmp(x[1], y[1]) )
