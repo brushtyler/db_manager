@@ -46,6 +46,9 @@ class DBTree(QTreeView):
 			if item == None: return
 		self.model().refreshItem(item)
 
+	def showSystemTables(self, show):
+		pass
+
 	def currentItem(self):
 		indexes = self.selectedIndexes()
 		if len(indexes) <= 0:
@@ -60,6 +63,12 @@ class DBTree(QTreeView):
 			return item.database()
 		except TypeError:	# it's a DBPlugin class object, no database
 			pass
+		return None
+
+	def currentSchema(self):
+		item = self.currentItem()
+		if item == None: return
+		if hasattr(item, 'schema'): return item.schema()
 		return None
 
 	def currentTable(self):

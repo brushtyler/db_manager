@@ -386,12 +386,7 @@ class DBModel(QAbstractItemModel):
 	def rowCount(self, parent):
 		parentItem = parent.internalPointer() if parent.isValid() else self.rootItem
 		if not parentItem.populated:
-			if parentItem.populate():
-				for child in parentItem.childItems:
-					self.connect(child, SIGNAL("itemChanged"), self.refreshItem)
-				self._onDataChanged( parent )
-			else:
-				self.emit( SIGNAL("notPopulated"), parent )
+			self._refreshIndex( parent )
 		return parentItem.childCount()
 
 	def hasChildren(self, parent):
@@ -431,10 +426,16 @@ class DBModel(QAbstractItemModel):
 		self.endRemoveRows()
 
 	def _refreshIndex(self, index):
-		self.removeRows(0, self.rowCount(index), index)
-		index.internalPointer().populated = False
-		if index.internalPointer().populate():
-			self._onDataChanged(index)		
+		item = index.internalPointer() if index.isValid() else self.rootItem
+		if item.populated:
+			self.removeRows(0, self.rowCount(index), index)
+			item.populated = False
+		if item.populate():
+			for child in item.childItems:
+				self.connect(child, SIGNAL("itemChanged"), self.refreshItem)
+			self._onDataChanged( index )
+		else:
+			self.emit( SIGNAL("notPopulated"), index )
 
 	def _onDataChanged(self, indexFrom, indexTo=None):
 		if indexTo == None: indexTo = indexFrom

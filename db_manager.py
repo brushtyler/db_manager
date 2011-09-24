@@ -112,7 +112,7 @@ class DBManager(QMainWindow):
 		elif current_tab == self.preview:
 			self.preview.loadPreview( item )
 
-	def showSqlWindow(self):
+	def runSqlWindow(self):
 		db = self.tree.currentDatabase()
 		if db == None:
 			QMessageBox.information(self, "Sorry", "No database selected or you are not connected to it.")
@@ -121,7 +121,11 @@ class DBManager(QMainWindow):
 		from dlg_sql_window import DlgSqlWindow
 		dlg = DlgSqlWindow(self.iface, db, self)
 		dlg.exec_()
+		# refresh the database tree 
 		self.refreshItem( db.connection() )
+
+	def showSystemTables(self):
+		self.tree.showSystemTables( self.actionShowSystemTables.isChecked() )
 
 
 	def registerAction(self, action, menu, callback):
@@ -203,13 +207,13 @@ class DBManager(QMainWindow):
 		# create menus
 		self.menuBar = QMenuBar(self)
 		self.menuDb = QMenu("&Database", self)
-		self.menuBar.addMenu(self.menuDb)
+		actionMenuDb = self.menuBar.addMenu(self.menuDb)
 		self.menuSchema = QMenu("&Schema", self)
-		self.menuBar.addMenu(self.menuSchema).setVisible(False)
+		actionMenuSchema = self.menuBar.addMenu(self.menuSchema)
 		self.menuTable = QMenu("&Table", self)
-		self.menuBar.addMenu(self.menuTable).setVisible(False)
+		actionMenuTable = self.menuBar.addMenu(self.menuTable)
 		self.menuHelp = QMenu("&Help", self)
-		self.menuBar.addMenu(self.menuHelp)
+		actionMenuHelp = self.menuBar.addMenu(self.menuHelp)
 
 		self.setMenuBar(self.menuBar)
 
@@ -222,10 +226,21 @@ class DBManager(QMainWindow):
 		# create menus' actions
 		# menu DATABASE
 		self.actionRefresh = self.menuDb.addAction( QIcon(":/db_manager/actions/refresh"), "&Refresh", self.refreshItem, QKeySequence("F5") )
-		self.actionSqlWindow = self.menuDb.addAction( QIcon(":/db_manager/actions/sql_window"), "&SQL window", self.showSqlWindow, QKeySequence("F2") )
+		self.actionSqlWindow = self.menuDb.addAction( QIcon(":/db_manager/actions/sql_window"), "&SQL window", self.runSqlWindow, QKeySequence("F2") )
 		self.actionClose = self.menuDb.addAction( QIcon(), "&Exit", self.close, QKeySequence("CTRL+Q") )
 
+		# menu SCHEMA
+		actionMenuSchema.setVisible(False)
+
+		# menu TABLE
+		actionMenuTable.setVisible(False)
+		self.actionShowSystemTables = self.menuTable.addAction("Show system tables/views", self.showSystemTables)
+		self.actionShowSystemTables.setCheckable(True)
+		self.actionShowSystemTables.setChecked(True)
+		self.actionShowSystemTables.setVisible(False)
+
 		# menu HELP
+		actionMenuHelp.setVisible(False)
 		#self.actionAbout = self.menuHelp.addAction("&About", self.about)
 
 		# add actions to the toolbar

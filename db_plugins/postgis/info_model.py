@@ -47,13 +47,13 @@ class PGTableInfo(TableInfo):
 
 		# privileges
 		# has the user access to this schema?
-		schema_priv = self.table.database().connector.getSchemaPrivileges(self.table.schema().name) if self.table.schema() else None
+		schema_priv = self.table.database().connector.getSchemaPrivileges(self.table.schemaName()) if self.table.schema() else None
 		if schema_priv == None:
 			pass
 		elif schema_priv[1] == False:	# no usage privileges on the schema
 			tbl.append( ("Privileges:", u"<warning> This user doesn't have usage privileges for this schema!" ) )
 		else:
-			table_priv = self.table.database().connector.getTablePrivileges(self.table.name, self.table.schema().name if self.table.schema() else None)
+			table_priv = self.table.database().connector.getTablePrivileges(self.table.name, self.table.schemaName() if self.table.schema() else None)
 			privileges = []
 			if table_priv[0]:
 				privileges.append("select")
@@ -69,8 +69,7 @@ class PGTableInfo(TableInfo):
 
 		ret.append( HtmlTable( tbl ) )
 
-		if schema_priv != None and len(schema_priv) > 0:
-			table_priv = self.table.database().connector.getTablePrivileges(self.table.name, self.table.schema().name if self.table.schema() else None)
+		if schema_priv != None and schema_priv[1]:
 			if table_priv[0] and not table_priv[1] and not table_priv[2] and not table_priv[3]:
 				ret.append( HtmlParagraph( u"<warning> This user has read-only privileges." ) )
 
