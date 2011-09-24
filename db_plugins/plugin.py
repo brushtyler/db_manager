@@ -187,6 +187,19 @@ class Database(DbItemObject):
 
 
 	def registerAllActions(self, mainWindow):
+		self.registerDatabaseActions(mainWindow)
+		self.registerSubPluginActions(mainWindow)
+
+	def registerSubPluginActions(self, mainWindow):
+		# load plugins!
+		try:
+			exec( u"from .%s.plugins import load" % self.dbplugin().typeName() )
+		except ImportError:
+			pass
+		else:
+			load(self, mainWindow)
+
+	def registerDatabaseActions(self, mainWindow):
 		if self.schemas() != None:
 			action = QAction("&Delete (empty) schema", self)
 			mainWindow.registerAction( action, "&Schema", self.deleteSchema )
@@ -194,6 +207,7 @@ class Database(DbItemObject):
 		mainWindow.registerAction( action, "&Table", self.deleteTable )
 		action = QAction("&Empty table", self)
 		mainWindow.registerAction( action, "&Table", self.emptyTable )
+
 
 	def schemasFactory(self, row, db):
 		return None
@@ -268,8 +282,11 @@ class Schema(DbItemObject):
 	def database(self):
 		return self.parent()
 
+	def schema(self):
+		return self
+
 	def tables(self):
-		return self.parent().tables(self)
+		return self.database().tables(self)
 
 	def delete(self):
 		ret = self.database().connector.deleteSchema(self.name)
@@ -491,6 +508,8 @@ class Table(DbItemObject):
 
 class VectorTable(Table):
 	def __init__(self, db, schema=None, parent=None):
+		if not hasattr(self, 'type'):	# check if the superclass constructor was called yet!
+			Table.__init__(self, db, schema, parent)
 		self.type = Table.VectorType
 		self.geomColumn = self.geomType = self.geomDim = self.srid = None
 
@@ -500,6 +519,8 @@ class VectorTable(Table):
 
 class RasterTable(Table):
 	def __init__(self, db, schema=None, parent=None):
+		if not hasattr(self, 'type'):	# check if the superclass constructor was called yet!
+			Table.__init__(self, db, schema, parent)
 		self.type = Table.RasterType
 		self.geomColumn = self.geomType = self.pixelSizeX = self.pixelSizeY = self.pixelType = self.isExternal = self.srid = None
 
