@@ -39,7 +39,7 @@ class BaseTableModel(QAbstractTableModel):
 	def rowCount(self, parent=None):
 		return len(self.resdata)
 	
-	def columnCount(self, parent):
+	def columnCount(self, parent=None):
 		return len(self._header)
 	
 	def data(self, index, role):
@@ -119,14 +119,13 @@ class DbSqlModel(BaseTableModel):
 		self._secs = t.elapsed() / 1000.0
 		del t
 
+		self._affectedRows = 0
 		data = []
 		try:
 			header = self.db._get_columns(c)
 			if len(header) > 0:
 				data = self.db._fetchall(c)
-				self._rowCount = len(data)
-			else:
-				self._rowCount = c.rowcount
+			self._affectedRows = c.rowcount
 		except DbError:
 			# nothing to fetch!
 			data = []
@@ -142,6 +141,6 @@ class DbSqlModel(BaseTableModel):
 	def secs(self):
 		return self._secs
 
-	def rowCount(self, parent=None):
-		return self._rowCount
+	def affectedRows(self):
+		return self._affectedRows
 

@@ -135,13 +135,17 @@ class PostGisDBConnector(DBConnector):
 		
 	def getSchemaPrivileges(self, schema):
 		""" schema privileges: (can create new objects, can access objects in schema) """
-		sql = u"SELECT has_schema_privilege(%(s)s, 'CREATE'), has_schema_privilege(%(s)s, 'USAGE')" % { 's' : self.quoteString(schema) }
+		schema = 'current_schema()' if schema == None else self.quoteString(schema)
+		sql = u"SELECT has_schema_privilege(%(s)s, 'CREATE'), has_schema_privilege(%(s)s, 'USAGE')" % { 's' : schema }
 		c = self.connection.cursor()
 		self._execute(c, sql)
 		return c.fetchone()
 	
 	def getTablePrivileges(self, table, schema=None):
 		""" table privileges: (select, insert, update, delete) """
+		schema_priv = self.getSchemaPrivileges(schema)
+		if not schema_priv[1]:
+			return
 		t = self.quoteId( (schema,table) )
 		sql = u"""SELECT has_table_privilege(%(t)s, 'SELECT'), has_table_privilege(%(t)s, 'INSERT'),
 		                has_table_privilege(%(t)s, 'UPDATE'), has_table_privilege(%(t)s, 'DELETE')""" % { 't': self.quoteString(t) }
@@ -681,6 +685,14 @@ class PostGisDBConnector(DBConnector):
 	def _fetchall(self, c):
 		try:
 			return c.fetchall()
+		except psycopg2.Error, e:
+			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
+			self.connection.rollback()
+			raise DbError(e)
+
+	def _fetchone(self, c):
+		try:
+			return c.fetchone()
 		except psycopg2.Error, e:
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self.connection.rollback()

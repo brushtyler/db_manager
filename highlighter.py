@@ -120,11 +120,13 @@ class SqlHighlighter(QSyntaxHighlighter):
 
 
 	def load(self, db=None):
+		self.rules = []
+
 		if False and db:
 			rules = db.connector.getSqlDictionary()
 		else:
 			from .sql_dictionary import getSqlDictionary
-			rules = getSqlDictionary()
+			rules = getSqlDictionary( db.connection().typeName() if db else None )
 
 		for name in self.styles.keys():
 			if not rules.has_key(name):

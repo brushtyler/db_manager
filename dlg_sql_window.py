@@ -97,7 +97,7 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 			# set the new model 
 			model = self.db.sqlDataModel( sql, self )
 			self.viewResult.setModel( model )
-			self.lblResult.setText("%d rows, %.1f seconds" % (model.rowCount(), model.secs()))
+			self.lblResult.setText("%d rows, %.1f seconds" % (model.affectedRows(), model.secs()))
 
 		except DbError, e:
 			QApplication.restoreOverrideCursor()
