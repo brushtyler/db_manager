@@ -129,6 +129,11 @@ class ConnectionItem(TreeItem):
 	def __init__(self, connection, parent=None):
 		TreeItem.__init__(self, connection, parent)
 
+		# load (shared) icon with first instance of table item
+		if not hasattr(ConnectionItem, 'connectedIcon'):
+			ConnectionItem.connectedIcon = QIcon(":/db_manager/icons/plugged.png")
+			ConnectionItem.disconnectedIcon = QIcon(":/db_manager/icons/unplugged.png")
+
 	def data(self, column):
 		if column == 0:
 			return self.getItemData().connectionName()
@@ -163,6 +168,11 @@ class ConnectionItem(TreeItem):
 		self.populated = True
 		return True
 
+	def isConnected(self):
+		return self.getItemData().database() != None
+
+	#def icon(self):
+	#	return self.connectedIcon if self.isConnected() else self.disconnectedIcon
 
 class SchemaItem(TreeItem):
 	def __init__(self, schema, parent):
