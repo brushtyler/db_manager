@@ -38,6 +38,11 @@ class DBConnector:
 		import qgis.core
 		return qgis.core.QgsDataSourceURI( self._uri.uri() )
 
+	def publicUri(self):
+		import qgis.core
+		publicUri = qgis.core.QgsDataSourceURI.removePassword( self._uri.uri() )
+		return qgis.core.QgsDataSourceURI( publicUri )
+
 	def hasCustomQuerySupport(self):
 		return False
 

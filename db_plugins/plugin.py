@@ -168,6 +168,9 @@ class Database(DbItemObject):
 	def uri(self):
 		return self.connector.uri()
 
+	def publicUri(self):
+		return self.connector.publicUri()
+
 	def info(self):
 		from .info_model import DatabaseInfo
 		return DatabaseInfo(self)
