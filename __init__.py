@@ -32,8 +32,8 @@ def version():
 def qgisMinimumVersion():
 	return "1.5.0"
 
-#def icon():
-#	return "icons/dbmanager.png"
+def icon():
+	return "icons/dbmanager.png"
 
 def authorName():
 	return "Giuseppe Sucameli"
