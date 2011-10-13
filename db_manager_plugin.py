@@ -34,7 +34,7 @@ class DBManagerPlugin:
 		self.dlg = None
 
 	def initGui(self):
-		self.action = QAction( QIcon(), u"DB Manager", self.iface.mainWindow() )
+		self.action = QAction( QIcon(":/db_manager/icon"), u"DB Manager", self.iface.mainWindow() )
 		QObject.connect( self.action, SIGNAL( "triggered()" ), self.run )
 		if hasattr( self.iface, 'addPluginToDatabaseMenu' ):
 			self.iface.addPluginToDatabaseMenu( u"DB Manager", self.action )
