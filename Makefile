@@ -16,6 +16,8 @@ $(UI_FILES): %_ui.py: %.ui
 $(RC_FILES): %_rc.py: %.qrc
 	pyrcc4 -o $@ $< || return 0
 
+resources_rc.py: icons/*
+
 clean:
 	rm -f $(GEN_FILES) *.pyc
 
