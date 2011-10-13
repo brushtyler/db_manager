@@ -9,8 +9,7 @@ copyright            : (C) 2011 by Giuseppe Sucameli
 email                : brush.tyler@gmail.com
 
 The content of this file is based on 
-Python Syntax Highlighting Example
-Copyright (C) 2009 Carson J. Q. Farmer
+- Python Syntax Highlighting Example by Carson J. Q. Farmer (GPLv2 license)
  ***************************************************************************/
 
 /***************************************************************************

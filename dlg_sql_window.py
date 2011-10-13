@@ -9,7 +9,7 @@ copyright            : (C) 2011 by Giuseppe Sucameli
 email                : brush.tyler@gmail.com
 
 The content of this file is based on 
-PostGIS Manager by Martin Dobias
+- PG_Manager by Martin Dobias (GPLv2 license)
  ***************************************************************************/
 
 /***************************************************************************
