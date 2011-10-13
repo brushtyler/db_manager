@@ -69,7 +69,7 @@ def run(item, action, mainwindow):
 		isTopoSchema = res != None and int(res[0]) > 0
 
 	if not isTopoSchema:
-		QMessageBox.critical(mainwindow, "Sorry", u'Select a topology SCHEMA.')
+		QMessageBox.critical(mainwindow, "Invalid topology", u'Schema "%s" is not registered in topology.topology.' % item.schema().name)
 		return False
 
 	# create the new project from the template one
