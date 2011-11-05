@@ -159,7 +159,7 @@ class PostGisDBConnector(DBConnector):
 	def getSchemas(self):
 		""" get list of schemas in tuples: (oid, name, owner, perms) """
 		c = self.connection.cursor()
-		sql = u"SELECT oid, nspname, pg_get_userbyid(nspowner), nspacl FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname != 'information_schema' ORDER BY nspname"
+		sql = u"SELECT oid, nspname, pg_get_userbyid(nspowner), nspacl, pg_catalog.obj_description(oid) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname != 'information_schema' ORDER BY nspname"
 		self._execute(c, sql)
 		return c.fetchall()
 
@@ -197,10 +197,14 @@ class PostGisDBConnector(DBConnector):
 			schema_where = u" AND (nspname != 'information_schema' AND nspname !~ 'pg_') "
 			
 		# get all tables and views
-		sql = u"""SELECT pg_class.relname, pg_namespace.nspname, pg_class.relkind = 'v', pg_get_userbyid(relowner), reltuples, relpages
-						FROM pg_class
-						JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
-						WHERE pg_class.relkind IN ('v', 'r')""" + schema_where + "ORDER BY nspname, relname"
+		sql = u"""SELECT 
+						cla.relname, nsp.nspname, cla.relkind = 'v', 
+						pg_get_userbyid(relowner), reltuples, relpages, 
+						pg_catalog.obj_description(cla.oid)
+					FROM pg_class AS cla 
+					JOIN pg_namespace AS nsp ON nsp.oid = cla.relnamespace
+					WHERE cla.relkind IN ('v', 'r') """ + schema_where + """
+					ORDER BY nsp.nspname, cla.relname"""
 						  
 		self._execute(c, sql)
 
@@ -248,7 +252,9 @@ class PostGisDBConnector(DBConnector):
 
 		# discovery of all tables and whether they contain a geometry column
 		sql = u"""SELECT 
-						cla.relname, nsp.nspname, cla.relkind = 'v', pg_get_userbyid(relowner), cla.reltuples, cla.relpages, 
+						cla.relname, nsp.nspname, cla.relkind = 'v', 
+						pg_get_userbyid(relowner), cla.reltuples, cla.relpages, 
+						pg_catalog.obj_description(cla.oid), 
 						CASE WHEN geo.f_geometry_column IS NOT NULL THEN geo.f_geometry_column ELSE att.attname END, 
 						CASE WHEN geo.type IS NOT NULL THEN geo.type ELSE textin(regtypeout(att.atttypid::regtype)) END, 
 						geo.coord_dimension, geo.srid
@@ -315,7 +321,9 @@ class PostGisDBConnector(DBConnector):
 
 		# discovery of all tables and whether they contain a geometry column
 		sql = u"""SELECT 
-						cla.relname, nsp.nspname, cla.relkind = 'v', pg_get_userbyid(relowner), cla.reltuples, cla.relpages, 
+						cla.relname, nsp.nspname, cla.relkind = 'v', 
+						pg_get_userbyid(relowner), cla.reltuples, cla.relpages, 
+						pg_catalog.obj_description(cla.oid), 
 						CASE WHEN geo.r_column IS NOT NULL THEN geo.r_column ELSE att.attname END, 
 						geo.pixel_types,
 						geo.scale_x,

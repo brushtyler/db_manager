@@ -1,3 +1,8 @@
+DB Manager TODO and DONE list.
+
+- Display schemas and tables comments (v0.1.6)
+
+
 DONE:
 - SLManager (replaced at all)
 - QSpatialite

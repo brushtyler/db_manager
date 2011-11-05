@@ -141,7 +141,9 @@ class SchemaInfo:
 			("Tables:", self.schema.tableCount)
 		]
 		if self.schema.owner:
-			tbl.append( ("Owner", self.schema.owner) )
+			tbl.append( ("Owner:", self.schema.owner) )
+		if self.schema.comment:
+			tbl.append( ("Comment:", self.schema.comment) )
 		return HtmlTable( tbl )
 
 	def privilegesDetails(self):
@@ -189,6 +191,9 @@ class TableInfo:
 			("Relation type:", "View" if self.table.isView else "Table"), 
 			("Rows:", self.table.rowCount if self.table.rowCount != None else "Unknown") 
 		]
+		if self.table.comment:
+			tbl.append( ("Comment:", self.table.comment) )
+
 		return HtmlTable( tbl )
 
 

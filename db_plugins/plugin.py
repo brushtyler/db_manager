@@ -277,6 +277,7 @@ class Schema(DbItemObject):
 	def __init__(self, db):
 		DbItemObject.__init__(self, db)
 		self.oid = self.name = self.owner = self.perms = None
+		self.comment = None
 		self.tableCount = 0
 
 	def __del__(self):
@@ -312,6 +313,7 @@ class Table(DbItemObject):
 		self.type = Table.TableType
 
 		self.name = self.isView = self.owner = self.pages = None
+		self.comment = None
 		self.rowCount = None
 
 		self._fields = self._indexes = self._constraints = self._triggers = self._rules = None
@@ -544,6 +546,7 @@ class TableField(TableSubItemObject):
 	def __init__(self, table):
 		TableSubItemObject.__init__(self, table)
 		self.num = self.name = self.dataType = self.modifier = self.notNull = self.default = self.hasDefault = self.primaryKey = None
+		self.comment = None
 
 	def type2String(self):
 		if self.modifier == None or self.modifier == -1:

@@ -40,10 +40,15 @@ class PGTableInfo(TableInfo):
 
 		tbl = [
 			("Relation type:", "View" if self.table.isView else "Table"), 
-			("Owner:", self.table.owner), 
+			("Owner:", self.table.owner)
+		]
+		if self.table.comment:
+			tbl.append( ("Comment:", self.table.comment) )
+
+		tbl.extend([
 			("Pages:", self.table.pages), 
 			("Rows (estimation):", self.table.estimatedRowCount )
-		]
+		])
 
 		# privileges
 		# has the user access to this schema?

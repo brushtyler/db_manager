@@ -157,14 +157,14 @@ class PGDatabase(Database):
 class PGSchema(Schema):
 	def __init__(self, row, db):
 		Schema.__init__(self, db)
-		self.oid, self.name, self.owner, self.perms = row
+		self.oid, self.name, self.owner, self.perms, self.comment = row
 		self.tableCount = len(self.tables())
 
 
 class PGTable(Table):
 	def __init__(self, row, db, schema=None):
 		Table.__init__(self, db, schema)
-		self.name, schema_name, self.isView, self.owner, self.estimatedRowCount, self.pages = row
+		self.name, schema_name, self.isView, self.owner, self.estimatedRowCount, self.pages, self.comment = row
 		self.estimatedRowCount = int(self.estimatedRowCount)
 
 	def runVacuumAnalyze(self):
