@@ -25,3 +25,5 @@ TODO:
     * query manager
 - QSpatialite
     * GUI to import QGis layer
+- SPIT
+    * mass import of shapefiles
