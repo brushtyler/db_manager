@@ -349,7 +349,7 @@ class Table(DbItemObject):
 			self.emit( SIGNAL('changed') )
 
 	def empty(self):
-		self.connector.emptyTable(item.name, item.schemaName())
+		self.database().connector.emptyTable(item.name, item.schemaName())
 		self.refreshRowCount()
 		self.emit( SIGNAL('changed') )
 
