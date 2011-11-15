@@ -68,10 +68,13 @@ class InfoViewer(QTextBrowser):
 	def _showDatabaseInfo(self, connection):
 		html  = u'<div style="background-color:#ccffcc;"><h1>&nbsp;%s</h1></div>' % connection.connectionName()
 		html += '<div style="margin-left:8px;">'
-		if connection.database() == None:
-			html += connection.info().toHtml()
-		else:
-			html += connection.database().info().toHtml()			
+		try:
+			if connection.database() == None:
+				html += connection.info().toHtml()
+			else:
+				html += connection.database().info().toHtml()			
+		except DbError, e:
+			html += u'<p style="color:red">%s</p>' % unicode(e).replace('\n', '<br>')
 		html += '</div>'
 		self.setHtml(html)
 	
@@ -79,15 +82,21 @@ class InfoViewer(QTextBrowser):
 	def _showSchemaInfo(self, schema):
 		html  = u'<div style="background-color:#ffcccc;"><h1>&nbsp;%s</h1></div>' % schema.name
 		html += '<div style="margin-left:8px;">'
-		html += schema.info().toHtml()
+		try:
+			html += schema.info().toHtml()
+		except DbError, e:
+			html += u'<p style="color:red">%s</p>' % unicode(e).replace('\n', '<br>')
 		html += "</div>"
 		self.setHtml(html)
 
 
 	def _showTableInfo(self, table):		
-		html = '<div style="background-color:#ccccff"><h1>&nbsp;%s</h1></div>' % table.name
+		html = u'<div style="background-color:#ccccff"><h1>&nbsp;%s</h1></div>' % table.name
 		html += '<div style="margin-left:8px;">'
-		html += table.info().toHtml()
+		try:
+			html += table.info().toHtml()
+		except DbError, e:
+			html += u'<p style="color:red">%s</p>' % unicode(e).replace('\n', '<br>')
 		html += '</div>'
 		self.setHtml(html)
 		return True
