@@ -1,22 +1,16 @@
 DB Manager TODO and DONE list.
 
-- Display schemas and tables comments (v0.1.6)
-
 
 DONE:
-- SLManager (replaced at all)
-- QSpatialite
-    * import QGis layer (done using Import Vector Layer feature)
-    * SQL syntax highlighting 
-- PGManager
-    * import/export data (done using Import Vector Layer feature)
-- RT_Sql_Layer
-    * load a query as layer into canvas
+* create table (v0.1.7)
+* display schemas and tables comments (v0.1.6)
+* SQL syntax highlighting (v0.1.5)
+* load a query as layer into canvas (v0.1.4)
+* import/export OGR layers and non-spatial data using Import Vector Layer feature (v.0.1.0)
 
 
 TODO:
 - PGManager
-    * create table
     * edit table
     * versioning
     * GUI to import/export data

@@ -11,6 +11,9 @@ The following is a list of contributors who have participated in the project:
 Version 0.1.5 includes patches from:
   Sandro Santilli <strk@keybit.net> for plugin icon.
 
+Version 0.1.2 includes:
+  TopoViewer plugin based on qgis_pgis_topoview by Sandro Santilli <strk@keybit.net> (see at https://github.com/strk/qgis_pgis_topoview/)
+
 Version 0.1.0 includes patches from:
   Mauricio de Paulo <mauricio.dev@gmail.com> for PostGIS Rasters support.
 
