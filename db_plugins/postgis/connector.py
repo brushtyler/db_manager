@@ -505,7 +505,7 @@ class PostGisDBConnector(DBConnector):
 			return
 
 
-	def createTable(self, table, fields, pkey=None, schema=None):
+	def createTable(self, table, fields, schema=None):
 		""" create ordinary table
 				'fields' is array containing instances of TableField
 				'pkey' contains name of column to be used as primary key
@@ -513,14 +513,30 @@ class PostGisDBConnector(DBConnector):
 		if len(fields) == 0:
 			return False
 
+		fields_def = map(lambda x: x.definition(), fields)
+		pkeys = filter(lambda x: x.primaryKey, fields)
+
 		sql = "CREATE TABLE %s (" % self.quoteId( (schema, table) )
-		sql += u", ".join( map(lambda x: x.definition(), fields) )
-		if pkey:
-			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkey)
+		sql += u", ".join( fields_def )
+		if len(pkeys) > 0:
+			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkeys[0].name)
 		sql += ")"
 
 		self._execute_and_commit(sql)
 		return True
+
+	def addGeometryColumn(self, table, geom_type, schema=None, geom_column='the_geom', srid=-1, dim=2):
+		# use schema if explicitly specified
+		schema_part = u""
+		if schema:
+			schema_part = u"%s, " % self.quoteString(schema)
+		sql = u"SELECT AddGeometryColumn(%s%s, %s, %d, %s, %d)" % (schema_part, self.quoteString(table), self.quoteString(geom_column), srid, self.quoteString(geom_type), dim)
+		self._execute_and_commit(sql)
+
+	def createSpatialIndex(self, table, schema=None, geom_column='the_geom'):
+		idx_name = self.quoteId("sidx_%s" % table)
+		sql = u"CREATE INDEX %s ON %s USING GIST(%s)" % (idx_name, self.quoteId((schema, table)), self.quoteId(geom_column))
+		self._execute_and_commit(sql)
 
 
 	def isVectorTable(self, table, schema=None):

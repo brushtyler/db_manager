@@ -154,13 +154,17 @@ class ConnectionItem(TreeItem):
 				QMessageBox.warning( None, u"Unable to connect", unicode(e) )
 				return False
 
+		database = connection.database()
+		self.connect(database, SIGNAL("changed"), self.itemChanged)
+		self.connect(database, SIGNAL("deleted"), self.itemRemoved)
+
 		QApplication.setOverrideCursor(Qt.WaitCursor)
-		schemas = connection.database().schemas()
+		schemas = database.schemas()
 		if schemas != None:
 			for s in schemas:
 				SchemaItem(s, self)
 		else:
-			tables = connection.database().tables()
+			tables = database.tables()
 			for t in tables:
 				TableItem(t, self)
 
@@ -312,7 +316,7 @@ class DBModel(QAbstractItemModel):
 			if self._getPath(index)[n] == path[0]:
 				return self._rPath2Index( path[1:], index, n+1 )
 
-		return QModelIndex()
+		return parent
 
 	def getItem(self, index):
 		if not index.isValid():
@@ -396,7 +400,7 @@ class DBModel(QAbstractItemModel):
 	def rowCount(self, parent):
 		parentItem = parent.internalPointer() if parent.isValid() else self.rootItem
 		if not parentItem.populated:
-			self._refreshIndex( parent )
+			self._refreshIndex( parent, True )
 		return parentItem.childCount()
 
 	def hasChildren(self, parent):
@@ -435,17 +439,19 @@ class DBModel(QAbstractItemModel):
 			item.removeChild(row)
 		self.endRemoveRows()
 
-	def _refreshIndex(self, index):
+	def _refreshIndex(self, index, force=False):
 		item = index.internalPointer() if index.isValid() else self.rootItem
-		if item.populated:
+		prevPopulated = item.populated
+		if prevPopulated:
 			self.removeRows(0, self.rowCount(index), index)
 			item.populated = False
-		if item.populate():
-			for child in item.childItems:
-				self.connect(child, SIGNAL("itemChanged"), self.refreshItem)
-			self._onDataChanged( index )
-		else:
-			self.emit( SIGNAL("notPopulated"), index )
+		if prevPopulated or force:
+			if item.populate():
+				for child in item.childItems:
+					self.connect(child, SIGNAL("itemChanged"), self.refreshItem)
+				self._onDataChanged( index )
+			else:
+				self.emit( SIGNAL("notPopulated"), index )
 
 	def _onDataChanged(self, indexFrom, indexTo=None):
 		if indexTo == None: indexTo = indexFrom

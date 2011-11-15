@@ -52,9 +52,9 @@ class DbError(BaseException):
 		self.query = unicode( query ) if query else None
 
 	def __unicode__(self):
-		msg = self.msg
+		msg = u"Error:\n%s" % self.msg
 		if self.query:
-			msg += u"\nQuery:\n%s" % self.query
+			msg += u"\n\nQuery:\n%s" % self.query
 		return msg
 
 
@@ -204,6 +204,8 @@ class Database(DbItemObject):
 
 	def registerDatabaseActions(self, mainWindow):
 		if self.schemas() != None:
+			action = QAction("&Create Schema", self)
+			mainWindow.registerAction( action, "&Schema", self.createSchema )
 			action = QAction("&Delete (empty) schema", self)
 			mainWindow.registerAction( action, "&Schema", self.deleteSchema )
 		action = QAction(QIcon(":/db_manager/actions/del_table"), "&Delete table/view", self)
@@ -211,15 +213,25 @@ class Database(DbItemObject):
 		action = QAction("&Empty table", self)
 		mainWindow.registerAction( action, "&Table", self.emptyTable )
 
+	def createSchema(self, item, action, parent):
+		if not isinstance(item, (DBPlugin, Schema, Table)) or item.database() == None:
+			QMessageBox.information(parent, "Sorry", "No database selected or you are not connected to it.")
+			return
+		(schema, ok) = QInputDialog.getText(parent, "New schema", "Enter new schema name")
+		if not ok:
+			return
+		self.connector.createSchema(schema)
+		self.emit( SIGNAL('changed') )
+
 
 	def schemasFactory(self, row, db):
 		return None
 
 	def schemas(self):
 		schemas = self.connector.getSchemas()
-		if schemas == None:
-			return None
-		return map(lambda x: self.schemasFactory(x, self), schemas)
+		if schemas != None:
+			schemas = map(lambda x: self.schemasFactory(x, self), schemas)
+		return schemas
 
 	def deleteSchema(self, item, action, parent):
 		if not isinstance(item, Schema):
@@ -249,9 +261,9 @@ class Database(DbItemObject):
 
 	def tables(self, schema=None):
 		tables = self.connector.getTables(schema.name if schema else None)
-		if tables == None:
-			return None
-		return map(lambda x: self.tablesFactory(x, self, schema), tables)
+		if tables != None:
+			tables = map(lambda x: self.tablesFactory(x, self, schema), tables)
+		return tables
 
 	def deleteTable(self, item, action, parent):
 		if not isinstance(item, Table):
@@ -270,7 +282,6 @@ class Database(DbItemObject):
 		if res != QMessageBox.Yes:
 			return
 		item.empty()
-		return
 
 
 class Schema(DbItemObject):
@@ -296,6 +307,7 @@ class Schema(DbItemObject):
 		ret = self.database().connector.deleteSchema(self.name)
 		if ret != False:
 			self.emit( SIGNAL('deleted') )
+		return ret
 
 	def info(self):
 		from .info_model import SchemaInfo
@@ -352,7 +364,6 @@ class Table(DbItemObject):
 		self.database().connector.emptyTable(item.name, item.schemaName())
 		self.refreshRowCount()
 		self.emit( SIGNAL('changed') )
-
 
 	def info(self):
 		from .info_model import TableInfo
@@ -541,6 +552,9 @@ class TableSubItemObject(QObject):
 	def table(self):
 		return self.parent()
 
+	def database(self):
+		return self.table().database()
+
 
 class TableField(TableSubItemObject):
 	def __init__(self, table):
@@ -559,13 +573,21 @@ class TableField(TableSubItemObject):
 		return self.default if self.default != None else "NULL"
 
 	def definition(self):
-		name = self.table().database().quoteId(self.name)
+		name = self.database().connector.quoteId(self.name)
 		not_null = "NOT NULL" if self.notNull else ""
 
 		txt = u"%s %s %s" % (name, self.type2String(), not_null)
 		if self.hasDefault:
 			txt += u" DEFAULT %s" % self.default2String()
 		return txt
+
+class NewTableField(TableField):
+	def __init__(self, db):
+		TableField.__init__(self, None)
+		self._database = db
+
+	def database(self):
+		return self._database
 
 
 class TableConstraint(TableSubItemObject):
