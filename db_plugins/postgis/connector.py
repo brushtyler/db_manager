@@ -244,10 +244,16 @@ class PostGisDBConnector(DBConnector):
 			schema_where = u" AND (nspname != 'information_schema' AND nspname !~ 'pg_') "
 
 		geometry_column_from = u""
+		geometry_fields_select = u"""att.attname, 
+						textin(regtypeout(att.atttypid::regtype)), 
+						NULL, NULL"""
 		if self.has_geometry_columns and self.has_geometry_columns_access:
 			geometry_column_from = u"""LEFT OUTER JOIN geometry_columns AS geo ON 
 						cla.relname = geo.f_table_name AND nsp.nspname = f_table_schema AND 
 						lower(att.attname) = lower(f_geometry_column)"""
+			geometry_fields_select = u"""CASE WHEN geo.f_geometry_column IS NOT NULL THEN geo.f_geometry_column ELSE att.attname END, 
+						CASE WHEN geo.type IS NOT NULL THEN geo.type ELSE textin(regtypeout(att.atttypid::regtype)) END, 
+						geo.coord_dimension, geo.srid"""
 			
 
 		# discovery of all tables and whether they contain a geometry column
@@ -255,9 +261,7 @@ class PostGisDBConnector(DBConnector):
 						cla.relname, nsp.nspname, cla.relkind = 'v', 
 						pg_get_userbyid(relowner), cla.reltuples, cla.relpages, 
 						pg_catalog.obj_description(cla.oid), 
-						CASE WHEN geo.f_geometry_column IS NOT NULL THEN geo.f_geometry_column ELSE att.attname END, 
-						CASE WHEN geo.type IS NOT NULL THEN geo.type ELSE textin(regtypeout(att.atttypid::regtype)) END, 
-						geo.coord_dimension, geo.srid
+						""" + geometry_fields_select + """
 
 					FROM pg_class AS cla 
 					JOIN pg_namespace AS nsp ON 
@@ -312,24 +316,26 @@ class PostGisDBConnector(DBConnector):
 		else:
 			schema_where = u" AND (nspname != 'information_schema' AND nspname !~ 'pg_') "
 
-		geometry_column_from = u""
+		raster_column_from = u""
+		raster_fields_select = u"""att.attname, NULL, NULL, NULL, NULL, NULL"""
 		if self.has_raster_columns and self.has_raster_columns_access:
-			geometry_column_from = u"""LEFT OUTER JOIN raster_columns AS geo ON 
+			raster_column_from = u"""LEFT OUTER JOIN raster_columns AS geo ON 
 						cla.relname = geo.r_table_name AND nsp.nspname = r_table_schema AND 
 						lower(att.attname) = lower(r_column)"""
-			
+			raster_fields_select = u"""CASE WHEN geo.r_column IS NOT NULL THEN geo.r_column ELSE att.attname END, 
+						geo.pixel_types,
+						geo.scale_x,
+						geo.scale_y,
+						geo.out_db,
+						geo.srid"""
+
 
 		# discovery of all tables and whether they contain a geometry column
 		sql = u"""SELECT 
 						cla.relname, nsp.nspname, cla.relkind = 'v', 
 						pg_get_userbyid(relowner), cla.reltuples, cla.relpages, 
 						pg_catalog.obj_description(cla.oid), 
-						CASE WHEN geo.r_column IS NOT NULL THEN geo.r_column ELSE att.attname END, 
-						geo.pixel_types,
-						geo.scale_x,
-						geo.scale_y,
-						geo.out_db,
-						geo.srid
+						""" + raster_fields_select + """
 
 					FROM pg_class AS cla 
 					JOIN pg_namespace AS nsp ON 
@@ -340,7 +346,7 @@ class PostGisDBConnector(DBConnector):
 						att.atttypid = 'raster'::regtype OR 
 						att.atttypid IN (SELECT oid FROM pg_type WHERE typbasetype='raster'::regtype ) 
 
-					""" + geometry_column_from + """ 
+					""" + raster_column_from + """ 
 
 					WHERE cla.relkind IN ('v', 'r') """ + schema_where + """ 
 					ORDER BY nsp.nspname, cla.relname, att.attname"""
