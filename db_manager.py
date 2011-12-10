@@ -243,7 +243,7 @@ class DBManager(QMainWindow):
 
 		# menu HELP
 		actionMenuHelp.setVisible(False)
-		#self.actionAbout = self.menuHelp.addAction("&About", self.about)
+		#self.actionAbout = self.menuHelp.addAction(QIcon(":/db_manager/about"), "&About", self.about)
 
 		# add actions to the toolbar
 		self.toolBar.addAction( self.actionRefresh )
