@@ -23,12 +23,12 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..data_model import DbTableModel, DbSqlModel
+from ..data_model import TableDataModel, SqlResultModel
 from ..plugin import DbError
 
-class SLTableModel(DbTableModel):
+class SLTableDataModel(TableDataModel):
 	def __init__(self, table, parent=None):
-		DbTableModel.__init__(self, table, parent)
+		TableDataModel.__init__(self, table, parent)
 
 		fields_txt = ", ".join(self.fields)
 		table_txt = self.db.quoteId( (self.table.schemaName(), self.table.name) )
@@ -56,6 +56,6 @@ class SLTableModel(DbTableModel):
 		return self.fetchedCount
 
 
-class SLSqlModel(DbSqlModel):
+class SLSqlResultModel(SqlResultModel):
 	pass
 

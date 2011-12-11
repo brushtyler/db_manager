@@ -101,9 +101,9 @@ class SLDatabase(Database):
 		from .info_model import SLDatabaseInfo
 		return SLDatabaseInfo(self)
 
-	def sqlDataModel(self, sql, parent):
-		from .data_model import SLSqlModel
-		return SLSqlModel(self, sql, parent)
+	def sqlResultModel(self, sql, parent):
+		from .data_model import SLSqlResultModel
+		return SLSqlResultModel(self, sql, parent)
 
 
 class SLTable(Table):
@@ -122,9 +122,9 @@ class SLTable(Table):
 		return SLTableTrigger(row, table)
 
 
-	def dataModel(self, parent):
-		from .data_model import SLTableModel
-		return SLTableModel(self, parent)
+	def tableDataModel(self, parent):
+		from .data_model import SLTableDataModel
+		return SLTableDataModel(self, parent)
 
 
 class SLVectorTable(SLTable, VectorTable):

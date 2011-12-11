@@ -135,20 +135,6 @@ class PGDatabase(Database):
 	def connectorsFactory(self, uri):
 		return PostGisDBConnector(uri)
 
-	def registerDatabaseActions(self, mainWindow):
-		action = QAction(QIcon(":/db_manager/actions/create_table"), "&Create Table", self)
-		mainWindow.registerAction( action, "&Table", self.createTable )
-		Database.registerDatabaseActions(self, mainWindow)
-
-	def createTable(self, item, action, parent):
-		if not hasattr(item, 'database') or item.database() == None:
-			QMessageBox.information(parent, "Sorry", "No database selected or you are not connected to it.")
-			return
-		from ...dlg_create_table import DlgCreateTable
-		DlgCreateTable(item, parent).exec_()
-		#self.emit( SIGNAL('changed') )	# already done in DlgCreateTable
-
-
 	def dataTablesFactory(self, row, db, schema=None):
 		return PGTable(row, db, schema)
 
@@ -161,9 +147,9 @@ class PGDatabase(Database):
 	def schemasFactory(self, row, db):
 		return PGSchema(row, db)
 
-	def sqlDataModel(self, sql, parent):
-		from .data_model import PGSqlModel
-		return PGSqlModel(self, sql, parent)
+	def sqlResultModel(self, sql, parent):
+		from .data_model import PGSqlResultModel
+		return PGSqlResultModel(self, sql, parent)
 
 
 class PGSchema(Schema):
@@ -227,9 +213,9 @@ class PGTable(Table):
 		from .info_model import PGTableInfo
 		return PGTableInfo(self)
 
-	def dataModel(self, parent):
-		from .data_model import PGTableModel
-		return PGTableModel(self, parent)
+	def tableDataModel(self, parent):
+		from .data_model import PGTableDataModel
+		return PGTableDataModel(self, parent)
 
 
 class PGVectorTable(PGTable, VectorTable):

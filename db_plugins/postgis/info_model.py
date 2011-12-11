@@ -127,8 +127,7 @@ class PGTableInfo(TableInfo):
 		for trig in self.table.triggers():
 			name = u'%(name)s (<a href="action:trigger/%(name)s/%(action)s">%(action)s</a>)' % { "name":trig.name, "action":"delete" }
 
-			enabled = "Yes" if trig.enabled else "No"
-			action = "disable" if trig.enabled else "enable"
+			(enabled, action) = ("Yes", "disable") if trig.enabled else ("No", "enable")
 			txt_enabled = u'%(enabled)s (<a href="action:trigger/%(name)s/%(action)s">%(action)s</a>)' % { "name":trig.name, "action":action, "enabled":enabled }
 
 			tbl.append( (name, trig.function, trig.type2String(), txt_enabled) )

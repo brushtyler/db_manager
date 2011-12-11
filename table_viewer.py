@@ -55,7 +55,7 @@ class TableViewer(QTableView):
 		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
 		try:
 			# set the new model
-			self.setModel( table.dataModel(self) )
+			self.setModel( table.tableDataModel(self) )
 
 		except DbError, e:
 			QApplication.restoreOverrideCursor()

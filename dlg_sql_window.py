@@ -95,7 +95,7 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 
 		try:
 			# set the new model 
-			model = self.db.sqlDataModel( sql, self )
+			model = self.db.sqlResultModel( sql, self )
 			self.viewResult.setModel( model )
 			self.lblResult.setText("%d rows, %.1f seconds" % (model.affectedRows(), model.secs()))
 

@@ -35,10 +35,10 @@ class BaseTableModel(QAbstractTableModel):
 
 	def columnNames(self):
 		return list(self._header)
-		
+
 	def rowCount(self, parent=None):
 		return len(self.resdata)
-	
+
 	def columnCount(self, parent=None):
 		return len(self._header)
 	
@@ -72,7 +72,7 @@ class BaseTableModel(QAbstractTableModel):
 			return QVariant(self._header[section])
 
 
-class DbTableModel(BaseTableModel):
+class TableDataModel(BaseTableModel):
 	def __init__(self, table, parent=None):
 		self.db = table.database().connector
 		self.table = table
@@ -108,7 +108,7 @@ class DbTableModel(BaseTableModel):
 		return self.table.rowCount if self.table.rowCount != None and self.columnCount(index) > 0 else 0
 
 
-class DbSqlModel(BaseTableModel):
+class SqlResultModel(BaseTableModel):
 	def __init__(self, db, sql, parent=None):
 		self.db = db.connector
 		c = self.db._get_cursor()
@@ -143,4 +143,80 @@ class DbSqlModel(BaseTableModel):
 
 	def affectedRows(self):
 		return self._affectedRows
+
+
+
+class SimpleTableModel(QStandardItemModel):
+	def __init__(self, header, parent=None):
+		self.header = header
+		QStandardItemModel.__init__(self, 0, len(self.header), parent)
+
+	@classmethod
+	def rowFromData(self, data):
+		row = []
+		for c in data:
+			row.append( QStandardItem(unicode(c)) )
+		return row
+
+	def headerData(self, section, orientation, role):
+		if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+			return QVariant(self.header[section])
+		return QVariant()
+
+
+class TableFieldsModel(SimpleTableModel):
+	def __init__(self, parent):
+		SimpleTableModel.__init__(self, ['Name', 'Type', 'Null', 'Default'], parent)
+
+	def headerData(self, section, orientation, role):
+		if orientation == Qt.Vertical and role == Qt.DisplayRole:
+			return QVariant(section+1)
+		return SimpleTableModel.headerData(self, section, orientation, role)
+
+
+	def appendField(self, fld):
+		data = [fld.name, fld.type2String(), not fld.notNull, fld.default2String()]
+		self.appendRow( self.rowFromData(data) )
+		row = self.rowCount()-1
+		self.setData(self.index(row, 0), QVariant(fld.primaryKey), Qt.UserRole)
+
+	def getFields(self):
+		from .plugin import TableField
+		flds = []
+		for row in range(self.rowCount()):
+			fld = TableField(None)
+			fld.name = self.data(self.index(row, 0)).toString()
+			fld.dataType = self.data(self.index(row, 1)).toString()
+			fld.notNull = not self.data(self.index(row, 2)).toBool()
+			fld.primaryKey = self.data(self.index(row, 0), Qt.UserRole).toBool()
+			flds.append( fld )
+		return flds
+
+
+class TableConstraintsModel(SimpleTableModel):
+	def __init__(self, parent):
+		SimpleTableModel.__init__(self, parent, ['Name', 'Type', 'Column(s)'])
+
+	def appendConstraint(self, constr):
+		field_names = map( lambda x,y: y.name, constr.fields() )
+		self.appendData( [constr.name, constr.type2String(), u", ".join(field_names)] )
+
+	def getConstraints(self, db):
+		from .plugin import TableConstraint
+		constrs = []
+		for row in range(self.rowCount()):
+			constr = TableConstraint(None, db)
+			constr.name = self.data(self.index(row, 0)).toString()
+			constr.type = self.data(self.index(row, 1)).toString()
+			constrs.append( constr )
+		return constrs
+
+
+class TableIndexesModel(SimpleTableModel):
+	def __init__(self, parent):
+		SimpleTableModel.__init__(self, parent, ['Name', 'Column(s)'])
+
+	def appendIndex(self, idx):
+		field_names = map( lambda x,y: y.name, idx.fields() )
+		self.appendData( [idx.name, u", ".join(field_names)] )
 

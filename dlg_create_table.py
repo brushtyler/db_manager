@@ -25,10 +25,12 @@ The content of this file is based on
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from .db_plugins.plugin import DbError, NewTableField
+from .db_plugins.data_model import TableFieldsModel
+from .db_plugins.plugin import DbError
 from .dlg_db_error import DlgDbError
 
 from ui.DlgCreateTable_ui import Ui_DlgCreateTable
+
 
 class TableFieldsDelegate(QItemDelegate):
 	""" delegate with some special item editors """
@@ -77,40 +79,27 @@ class TableFieldsDelegate(QItemDelegate):
 				self.emit(SIGNAL("columnNameChanged()"))
 
 
-
-class TableFieldsModel(QStandardItemModel):
-	def __init__(self, parent):
-		QStandardItemModel.__init__(self, 0,3, parent)
-		self.header = ['Name', 'Type', 'Not Null']
-		
-	def headerData(self, section, orientation, role):
-		if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-			return QVariant(self.header[section])
-		return QVariant()
-
-
 class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 	
 	def __init__(self, item, parent=None):
 		QDialog.__init__(self, parent)
 		self.item = item
-		self._debugApp = self.item == None
 		self.setupUi(self)
 
-		if not self._debugApp:
-			self.db = self.item.database()
-			self.schemas = self.db.schemas()
-			self.hasSchemas = self.schemas != None
-			self.fieldTypes = self.db.connector.fieldTypes()
-		else:
+		if self.item == None:
 			self.db = None
 			self.schemas = ['public', 'test']
 			self.hasSchemas = True
 			self.fieldTypes = ['integer', 'float', 'varchar(n)']
-			
+		else:
+			self.db = self.item.database()
+			self.schemas = self.db.schemas()
+			self.hasSchemas = self.schemas != None
+			self.fieldTypes = self.db.connector.fieldTypes()			
 
 		m = TableFieldsModel(self)
 		self.fields.setModel(m)
+		self.fields.setColumnHidden(3, True)	# hide Default column
 		
 		d = TableFieldsDelegate(self.fieldTypes, self)
 		self.fields.setItemDelegate(d)
@@ -151,6 +140,9 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 					index = self.cboSchema.count()-1
 		self.cboSchema.setCurrentIndex(index)
 
+	def hideSchemas(self):
+		self.cboSchema.setEnabled(False)
+
 		
 	def updateUi(self):
 		useGeom = self.chkGeomColumn.isChecked()
@@ -162,7 +154,6 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 		
 	def updateUiFields(self):
 		fld = self.selectedField()
-		print ">>>", fld
 		if fld is not None:
 			up_enabled = (fld != 0)
 			down_enabled = (fld != self.fields.model().rowCount()-1)
@@ -301,18 +292,12 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 				QMessageBox.information(self, "sorry", "set geometry column name")
 				return
 
-		pkey = unicode(self.cboPrimaryKey.currentText())
+		flds = m.getFields()
+		pk_index = self.cboPrimaryKey.currentIndex()
+		if pk_index >= 0:
+			flds[ pk_index ].primaryKey = True
 
-		flds = []
-		for row in xrange(m.rowCount()):
-			fld = NewTableField(self.db)
-			fld.name = unicode(m.data(m.index(row,0,QModelIndex())).toString())
-			fld.dataType = unicode(m.data(m.index(row,1,QModelIndex())).toString())
-			fld.notNull = not m.data(m.index(row,2,QModelIndex())).toBool()
-			fld.primaryKey = fld.name == pkey
-			flds.append( fld )
-				
-		if not self._debugApp:
+		if self.db != None:
 			# commit to DB
 			QApplication.setOverrideCursor(Qt.WaitCursor)
 			try:

@@ -23,14 +23,14 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ..data_model import DbTableModel, DbSqlModel
+from ..data_model import TableDataModel, SqlResultModel
 from ..plugin import DbError
 
 
-class PGTableModel(DbTableModel):
+class PGTableDataModel(TableDataModel):
 	def __init__(self, table, parent=None):
 		self.cursor = None
-		DbTableModel.__init__(self, table, parent)
+		TableDataModel.__init__(self, table, parent)
 
 		if self.table.rowCount == None:
 			self.table.refreshRowCount()
@@ -50,9 +50,9 @@ class PGTableModel(DbTableModel):
 	def _sanitizeTableField(self, field):
 		# get fields, ignore geometry columns
 		if field.dataType.lower() == "geometry":
-			return u'GeometryType(%s)' % self.db.quoteId(field.name)
+			return u"CASE WHEN %(fld)s IS NULL THEN NULL ELSE GeometryType(%(fld)s) END AS %(fld)s" % {'fld': self.db.quoteId(field.name)}
 		elif field.dataType.lower() == "raster":
-			return u"'RASTER'"
+			return u"CASE WHEN %(fld)s IS NULL THEN NULL ELSE 'RASTER' END AS %(fld)s" % {'fld': self.db.quoteId(field.name)}
 		return u"%s::text" % self.db.quoteId(field.name)
 
 
@@ -76,6 +76,6 @@ class PGTableModel(DbTableModel):
 		self.fetchedFrom = row_start
 
 
-class PGSqlModel(DbSqlModel):
+class PGSqlResultModel(SqlResultModel):
 	pass
 

@@ -46,6 +46,7 @@ class DBConnector:
 	def hasCustomQuerySupport(self):
 		return False
 
+	@classmethod
 	def quoteId(self, identifier):
 		if hasattr(identifier, '__iter__'):
 			ids = list()
@@ -58,6 +59,7 @@ class DBConnector:
 		identifier = unicode(identifier) if identifier != None else unicode() # make sure it's python unicode string
 		return u'"%s"' % identifier.replace('"', '""')
 	
+	@classmethod
 	def quoteString(self, txt):
 		""" make the string safe - replace ' with '' """
 		if hasattr(txt, '__iter__'):

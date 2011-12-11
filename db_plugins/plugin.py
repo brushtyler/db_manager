@@ -26,6 +26,8 @@ from PyQt4.QtGui import *
 from ..db_plugins import createDbPlugin
 from .html_elems import HtmlParagraph, HtmlTable
 
+from .connector import DBConnector
+
 class BaseException(Exception):
 	def __init__(self, msg):
 		try:
@@ -176,8 +178,10 @@ class Database(DbItemObject):
 		return DatabaseInfo(self)
 
 
-	def sqlDataModel(self, sql, parent):
-		pass
+	def sqlResultModel(self, sql, parent):
+		from .data_model import SqlResultModel
+		return SqlResultModel(self, sql, parent)
+
 
 	def toSqlLayer(self, sql, geomCol, uniqueCol, layerName="QueryLayer", layerType=None):
 		from qgis.core import QgsMapLayer, QgsVectorLayer, QgsRasterLayer
@@ -204,10 +208,13 @@ class Database(DbItemObject):
 
 	def registerDatabaseActions(self, mainWindow):
 		if self.schemas() != None:
-			action = QAction("&Create Schema", self)
+			action = QAction("&Create schema", self)
 			mainWindow.registerAction( action, "&Schema", self.createSchema )
 			action = QAction("&Delete (empty) schema", self)
 			mainWindow.registerAction( action, "&Schema", self.deleteSchema )
+
+		action = QAction(QIcon(":/db_manager/actions/create_table"), "&Create table", self)
+		mainWindow.registerAction( action, "&Table", self.createTable )
 		action = QAction(QIcon(":/db_manager/actions/del_table"), "&Delete table/view", self)
 		mainWindow.registerAction( action, "&Table", self.deleteTable )
 		action = QAction("&Empty table", self)
@@ -241,6 +248,15 @@ class Database(DbItemObject):
 		if res != QMessageBox.Yes:
 			return
 		item.delete()
+
+
+	def createTable(self, item, action, parent):
+		if not hasattr(item, 'database') or item.database() == None:
+			QMessageBox.information(parent, "Sorry", "No database selected or you are not connected to it.")
+			return
+		from ..dlg_create_table import DlgCreateTable
+		DlgCreateTable(item, parent).exec_()
+		#self.emit( SIGNAL('changed') )	# already done in DlgCreateTable
 
 	def tablesFactory(self, row, db, schema=None):
 		typ, row = row[0], row[1:]
@@ -411,7 +427,7 @@ class Table(DbItemObject):
 		return ret
 
 
-	def dataModel(self, parent):
+	def tableDataModel(self, parent):
 		pass
 
 
@@ -553,7 +569,7 @@ class TableSubItemObject(QObject):
 		return self.parent()
 
 	def database(self):
-		return self.table().database()
+		return self.table().database() if self.table() else None
 
 
 class TableField(TableSubItemObject):
@@ -573,21 +589,15 @@ class TableField(TableSubItemObject):
 		return self.default if self.default != None else "NULL"
 
 	def definition(self):
-		name = self.database().connector.quoteId(self.name)
+		quoteIdFunc = self.database().connector.quoteId if self.database() else DBConnector.quoteId
+
+		name = quoteIdFunc(self.name)
 		not_null = "NOT NULL" if self.notNull else ""
 
 		txt = u"%s %s %s" % (name, self.type2String(), not_null)
 		if self.hasDefault:
 			txt += u" DEFAULT %s" % self.default2String()
 		return txt
-
-class NewTableField(TableField):
-	def __init__(self, db):
-		TableField.__init__(self, None)
-		self._database = db
-
-	def database(self):
-		return self._database
 
 
 class TableConstraint(TableSubItemObject):
@@ -601,7 +611,7 @@ class TableConstraint(TableSubItemObject):
 
 	def __init__(self, table):
 		TableSubItemObject.__init__(self, table)
-		self.name = self.type = self._columns = None
+		self.name = self.type = self.columns = None
 
 	def type2String(self):
 		if self.type == TableConstraint.TypeCheck: return "Check"
@@ -671,6 +681,7 @@ class TableTrigger(TableSubItemObject):
 		trig_type += "for each "
 		trig_type += "row" if self.type & TableTrigger.TypeRow else "statement"
 		return trig_type
+
 
 class TableRule(TableSubItemObject):
 	def __init__(self, table):

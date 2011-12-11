@@ -514,7 +514,6 @@ class PostGisDBConnector(DBConnector):
 	def createTable(self, table, fields, schema=None):
 		""" create ordinary table
 				'fields' is array containing instances of TableField
-				'pkey' contains name of column to be used as primary key
 		"""
 		if len(fields) == 0:
 			return False

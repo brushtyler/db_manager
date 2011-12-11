@@ -307,18 +307,20 @@ class SpatiaLiteDBConnector(DBConnector):
 		return c.fetchone()[0]
 
 
-	def createTable(self, table, fields, pkey=None, schema=None):
+	def createTable(self, table, fields, schema=None):
 		""" create ordinary table
 				'fields' is array containing instances of TableField
-				'pkey' contains name of column to be used as primary key
 		"""
 		if len(fields) == 0:
 			return False
-		
-		sql = u"CREATE TABLE %s (" % self.quoteId(table)
-		sql += u", ".join( map(lambda x: x.definition(), fields) )
-		if pkey:
-			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkey)
+
+		fields_def = map(lambda x: x.definition(), fields)
+		pkeys = filter(lambda x: x.primaryKey, fields)
+
+		sql = "CREATE TABLE %s (" % self.quoteId( (schema, table) )
+		sql += u", ".join( fields_def )
+		if len(pkeys) > 0:
+			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkeys[0].name)
 		sql += ")"
 
 		self._execute_and_commit(sql)
