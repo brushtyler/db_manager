@@ -424,7 +424,7 @@ class PostGisDBConnector(DBConnector):
 		c = self.connection.cursor()
 		
 		schema_where = u" AND nspname=%s " % self.quoteString(schema) if schema is not None else ""
-		sql = u"""SELECT tgname, proname, tgtype, tgenabled FROM pg_trigger trig
+		sql = u"""SELECT tgname, proname, tgtype, tgenabled NOT IN ('f', 'D')  FROM pg_trigger trig
 		          LEFT JOIN pg_class t ON trig.tgrelid = t.oid
 							LEFT JOIN pg_proc p ON trig.tgfoid = p.oid
 							JOIN pg_namespace nsp ON t.relnamespace = nsp.oid
