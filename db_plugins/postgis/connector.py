@@ -171,20 +171,25 @@ class PostGisDBConnector(DBConnector):
 		sys_tables = [ "spatial_ref_sys", "geography_columns", "geometry_columns", 
 				"raster_columns", "raster_overviews" ]
 
-		vectors = self.getVectorTables(schema)
-		for tbl in vectors:
-			if tbl[1] in sys_tables and tbl[2] in ['', 'public']:
-				continue
-			tablenames.append( (tbl[2], tbl[1]) )
-			items.append( tbl )
+		try:
+			vectors = self.getVectorTables(schema)
+			for tbl in vectors:
+				if tbl[1] in sys_tables and tbl[2] in ['', 'public']:
+					continue
+				tablenames.append( (tbl[2], tbl[1]) )
+				items.append( tbl )
+		except DbError:
+			pass
 
-		rasters = self.getRasterTables(schema)
-		for tbl in rasters:
-			if tbl[1] in sys_tables and tbl[2] in ['', 'public']:
-				continue
-			tablenames.append( (tbl[2], tbl[1]) )
-			items.append( tbl )
-
+		try:
+			rasters = self.getRasterTables(schema)
+			for tbl in rasters:
+				if tbl[1] in sys_tables and tbl[2] in ['', 'public']:
+					continue
+				tablenames.append( (tbl[2], tbl[1]) )
+				items.append( tbl )
+		except DbError:
+			pass
 
 		c = self.connection.cursor()
 
@@ -297,7 +302,7 @@ class PostGisDBConnector(DBConnector):
 				tuples
 				pages
 				raster_column:
-					r_column (or pg_attribute.attname, the raster column name)
+					r_raster_column (or pg_attribute.attname, the raster column name)
 					pixel type
 					block size
 					internal or external
@@ -319,18 +324,18 @@ class PostGisDBConnector(DBConnector):
 		raster_column_from = u""
 		raster_fields_select = u"""att.attname, NULL, NULL, NULL, NULL, NULL"""
 		if self.has_raster_columns and self.has_raster_columns_access:
-			raster_column_from = u"""LEFT OUTER JOIN raster_columns AS geo ON 
-						cla.relname = geo.r_table_name AND nsp.nspname = r_table_schema AND 
+			raster_column_from = u"""LEFT OUTER JOIN raster_columns AS rast ON 
+						cla.relname = rast.r_table_name AND nsp.nspname = r_table_schema AND 
 						lower(att.attname) = lower(r_column)"""
-			raster_fields_select = u"""CASE WHEN geo.r_column IS NOT NULL THEN geo.r_column ELSE att.attname END, 
-						geo.pixel_types,
-						geo.scale_x,
-						geo.scale_y,
-						geo.out_db,
-						geo.srid"""
+			raster_fields_select = u"""CASE WHEN rast.r_raster_column IS NOT NULL THEN rast.r_raster_column ELSE att.attname END, 
+						rast.pixel_types,
+						rast.scale_x,
+						rast.scale_y,
+						rast.out_db,
+						rast.srid"""
 
 
-		# discovery of all tables and whether they contain a geometry column
+		# discovery of all tables and whether they contain a raster column
 		sql = u"""SELECT 
 						cla.relname, nsp.nspname, cla.relkind = 'v', 
 						pg_get_userbyid(relowner), cla.reltuples, cla.relpages, 
