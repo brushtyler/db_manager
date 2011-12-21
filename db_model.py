@@ -425,10 +425,10 @@ class DBModel(QAbstractItemModel):
 			try:
 				obj.rename(new_value)
 				self._onDataChanged(index)
-				return True
 			except DbError, e:
 				DlgDbError.showError(e, None)
 				return False
+			return True
 
 		return False
 
@@ -548,27 +548,21 @@ class DBModel(QAbstractItemModel):
 				outUri = outDb.uri()
 				outUri.setDataSource( schema, layerName, geomCol, sql, pkCol )
 
-				params = []
-				params.append( inLayer )	# input layer
-				params.append( outUri.uri() )	# output uri
-				params.append( outDb.dbplugin().providerName() )	# output providerKey
-				params.append( None )	# destination CRS
-
 				added = added + 1
-				self.emit( SIGNAL("importVector"), params, toIndex )
+				self.emit( SIGNAL("importVector"), inLayer, outDb, outUri, toIndex )
 
 		return added > 0
 
 
-	def importVector(self, params, parent):
+	def importVector(self, inLayer, outDb, outUri, parent):
 		if not self.isImportVectorAvail:
 			return False
 
-		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
-		ret, errMsg = qgis.core.QgsVectorLayerImport.importLayer( *params )
-		QApplication.restoreOverrideCursor()
-		if ret != 0:
-			QMessageBox.warning( None, "Error [%d]" % ret, errMsg )
-		else:
-			self._refreshIndex( parent )
-
+		try:
+			from dlg_import_vector import DlgImportVector
+			dlg = DlgImportVector(inLayer, outDb, outUri)
+			QApplication.restoreOverrideCursor()
+			if dlg.exec_():
+				self._refreshIndex( parent )
+		finally:
+			inLayer.deleteLater()
