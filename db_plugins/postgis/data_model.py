@@ -63,10 +63,9 @@ class PGTableDataModel(TableDataModel):
 		pass	#print "PGTableModel.__del__"
 
 	def fetchMoreData(self, row_start):
-		import psycopg2
 		try:
 			self.cursor.scroll(row_start, mode='absolute')
-		except psycopg2.ProgrammingError:
+		except self.db.connector._error_types():
 			self.cursor.close()
 			del self.cursor
 			self._createCursor()

@@ -58,7 +58,7 @@ class PGTableInfo(TableInfo):
 		elif schema_priv[1] == False:	# no usage privileges on the schema
 			tbl.append( ("Privileges:", u"<warning> This user doesn't have usage privileges for this schema!" ) )
 		else:
-			table_priv = self.table.database().connector.getTablePrivileges(self.table.name, self.table.schemaName() if self.table.schema() else None)
+			table_priv = self.table.database().connector.getTablePrivileges( (self.table.schemaName(), self.table.name) )
 			privileges = []
 			if table_priv[0]:
 				privileges.append("select")

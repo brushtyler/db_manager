@@ -166,8 +166,9 @@ class PGTable(Table):
 		self.estimatedRowCount = int(self.estimatedRowCount)
 
 	def runVacuumAnalyze(self):
-		self.database().connector.runVacuumAnalyze(self.name, self.schemaName())
-		self.schema().emit(SIGNAL('changed'))	# TODO change only this item
+		self.database().connector.runVacuumAnalyze( (self.schemaName(), self.name) )
+		# TODO: change only this item, not re-create all the tables in the schema
+		self.schema().refresh()
 
 	def runAction(self, action):
 		action = unicode(action)
@@ -187,8 +188,8 @@ class PGTable(Table):
 				return False
 
 			if rule_action == "delete":
-				self.database().connector.deleteTableRule(rule_name, self.name, self.schemaName())
-				self._rules = None	# refresh rules
+				self.database().connector.deleteTableRule(rule_name, (self.schemaName(), self.name))
+				self.refreshRules()
 				return True
 
 		return Table.runAction(self, action)
@@ -264,9 +265,12 @@ class PGTableField(TableField):
 
 		# convert the modifier to string (e.g. "precision,scale")
 		if self.modifier != None and self.modifier != -1:
-			if self.dataType in ["numeric", "geometry"]:
-				if typeStr.startswith( "%s(" % self.dataType ):
-					self.modifier = typeStr[ len(self.dataType)+1 : -1 ]
+			trimmedTypeStr = QString(typeStr).trimmed()
+			if trimmedTypeStr.startsWith(self.dataType):
+				regex = QRegExp( "%s\s*\((.+)\)$" % QRegExp.escape(self.dataType) )
+				startpos = regex.indexIn( trimmedTypeStr )
+				if startpos >= 0:
+					self.modifier = regex.cap(1).trimmed()
 				else:
 					self.modifier = None
 

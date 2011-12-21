@@ -229,19 +229,19 @@ class SpatiaLiteDBConnector(DBConnector):
 			
 		return items
 
-	def getTableRowCount(self, table, schema=None):
+	def getTableRowCount(self, table):
 		c = self.connection.cursor()
 		self._execute(c, u"SELECT COUNT(*) FROM %s" % self.quoteId(table) )
 		return c.fetchone()[0]
 
-	def getTableFields(self, table, schema=None):
+	def getTableFields(self, table):
 		""" return list of columns in table """
 		c = self.connection.cursor()
 		sql = u"PRAGMA table_info(%s)" % (self.quoteId(table))
 		self._execute(c, sql)
 		return c.fetchall()
 
-	def getTableIndexes(self, table, schema=None):
+	def getTableIndexes(self, table):
 		""" get info about table's indexes """
 		c = self.connection.cursor()
 		sql = u"PRAGMA index_list(%s)" % (self.quoteId(table))
@@ -262,26 +262,27 @@ class SpatiaLiteDBConnector(DBConnector):
 
 		return indexes
 
-	def getTableConstraints(self, table, schema=None):
+	def getTableConstraints(self, table):
 		return None
 
-	def getTableTriggers(self, table, schema=None):
+	def getTableTriggers(self, table):
 		c = self.connection.cursor()
-		sql = u"SELECT name, sql FROM sqlite_master WHERE lower(tbl_name) = lower(%s) AND type = 'trigger'" % (self.quoteString(table))
+		schema, tablename = self.getSchemaTableName(table)
+		sql = u"SELECT name, sql FROM sqlite_master WHERE lower(tbl_name) = lower(%s) AND type = 'trigger'" % (self.quoteString(tablename))
 		self._execute(c, sql)
 		return c.fetchall()
 
-	def deleteTableTrigger(self, trigger, table=None, schema=None):
+	def deleteTableTrigger(self, trigger, table=None):
 		""" delete trigger """
 		sql = u"DROP TRIGGER %s" % self.quoteId(trigger)
 		self._execute_and_commit(sql)
 
 
-	def getTableEstimatedExtent(self, geom, table, schema=None):
+	def getTableEstimatedExtent(self, geom, table):
 		""" find out estimated extent (from the statistics) """
 		c = self.connection.cursor()
 
-		if self.isRasterTable(table, schema):
+		if self.isRasterTable(table):
 			table = QString(table).replace('_rasters', '_metadata')
 			geom = u'geometry'
 
@@ -293,9 +294,10 @@ class SpatiaLiteDBConnector(DBConnector):
 			return
 		return c.fetchone()
 	
-	def getViewDefinition(self, view, schema=None):
+	def getViewDefinition(self, view):
 		""" returns definition of the view """
-		sql = u"SELECT sql FROM sqlite_master WHERE type = 'view' AND name = %s" % self.quoteString(view)
+		schema, tablename = self.getSchemaTableName(view)
+		sql = u"SELECT sql FROM sqlite_master WHERE type = 'view' AND name = %s" % self.quoteString(tablename)
 		c = self.connection.cursor()
 		self._execute(c, sql)
 		return c.fetchone()[0]
@@ -307,74 +309,64 @@ class SpatiaLiteDBConnector(DBConnector):
 		return c.fetchone()[0]
 
 
-	def createTable(self, table, fields, schema=None):
-		""" create ordinary table
-				'fields' is array containing instances of TableField
-		"""
-		if len(fields) == 0:
-			return False
-
-		fields_def = map(lambda x: x.definition(), fields)
-		pkeys = filter(lambda x: x.primaryKey, fields)
-
-		sql = "CREATE TABLE %s (" % self.quoteId( (schema, table) )
-		sql += u", ".join( fields_def )
-		if len(pkeys) > 0:
-			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkeys[0].name)
-		sql += ")"
-
-		self._execute_and_commit(sql)
-		return True
-
-	def isVectorTable(self, table, schema=None):
+	def isVectorTable(self, table):
 		if self.has_geometry_columns:
 			c = self.connection.cursor()
-			sql = u"SELECT count(*) FROM geometry_columns WHERE f_table_name = %s" % self.quoteString(table)
+			schema, tablename = self.getSchemaTableName(table)
+			sql = u"SELECT count(*) FROM geometry_columns WHERE f_table_name = %s" % self.quoteString(tablename)
 			self._execute(c, sql)
 			return c.fetchone()[0] > 0
 		return True
 
-	def isRasterTable(self, table, schema=None):
+	def isRasterTable(self, table):
 		if self.has_geometry_columns and self.has_raster:
-			if not QString(table).endsWith( "_rasters" ):
+			schema, tablename = self.getSchemaTableName(table)
+			if not QString(tablename).endsWith( "_rasters" ):
 				return False
 
 			c = self.connection.cursor()
 			sql = u"""SELECT count(*) 
 					FROM layer_params AS r JOIN geometry_columns AS g 
 						ON r.table_name||'_metadata' = g.f_table_name
-					WHERE r.table_name = REPLACE(%s, '_rasters', '')""" % self.quoteString(table)
+					WHERE r.table_name = REPLACE(%s, '_rasters', '')""" % self.quoteString(tablename)
 			self._execute(c, sql)
 			return c.fetchone()[0] > 0
 		return False
 
-	def deleteTable(self, table, schema=None):
+
+	# moved into the parent class: DbConnector.createTable()
+	#def createTable(self, table, field_defs, pkey, schema=None):
+	#	pass
+
+	def deleteTable(self, table):
 		""" delete table from the database """
-		if self.isRasterTable(table, schema):
+		if self.isRasterTable(table):
 			return False
 
 		c = self.connection.cursor()
 		sql = u"DROP TABLE %s" % self.quoteId(table)
 		self._execute(c, sql)
-		sql = u"DELETE FROM geometry_columns WHERE lower(f_table_name) = lower(%s)" % self.quoteString(table)
+		schema, tablename = self.getSchemaTableName(table)
+		sql = u"DELETE FROM geometry_columns WHERE lower(f_table_name) = lower(%s)" % self.quoteString(tablename)
 		self._execute(c, sql)
 		self.connection.commit()
 
 
-	def emptyTable(self, table, schema=None):
+	def emptyTable(self, table):
 		""" delete all rows from table """
-		if self.isRasterTable(table, schema):
+		if self.isRasterTable(table):
 			return False
 
 		sql = u"DELETE FROM %s" % self.quoteId(table)
 		self._execute_and_commit(sql)
 		
-	def renameTable(self, table, new_table, schema=None):
+	def renameTable(self, table, new_table):
 		""" rename a table """
-		if new_table == table:
+		schema, tablename = self.getSchemaTableName(table)
+		if new_table == tablename:
 			return
 
-		if self.isRasterTable(table, schema):
+		if self.isRasterTable(table):
 			return False
 
 		c = self.connection.cursor()
@@ -384,30 +376,30 @@ class SpatiaLiteDBConnector(DBConnector):
 		
 		# update geometry_columns
 		if self.has_geometry_columns:
-			sql = u"UPDATE geometry_columns SET f_table_name=%s WHERE f_table_name=%s" % (self.quoteString(new_table), self.quoteString(table))
+			sql = u"UPDATE geometry_columns SET f_table_name=%s WHERE f_table_name=%s" % (self.quoteString(new_table), self.quoteString(tablename))
 			self._execute(c, sql)
 
 		self.connection.commit()
 
-	def moveTable(self, table, new_table, schema=None, new_schema=None):
+	def moveTable(self, table, new_table, new_schema=None):
 		return self.renameTable(table, new_table)
 		
-	def createView(self, name, query, schema=None):
-		sql = u"CREATE VIEW %s AS %s" % (self.quoteId(name), query)
+	def createView(self, view, query):
+		sql = u"CREATE VIEW %s AS %s" % (self.quoteId(view), query)
 		self._execute_and_commit(sql)
 	
-	def deleteView(self, name, schema=None):
-		sql = u"DROP VIEW %s" % self.quoteId(name)
+	def deleteView(self, view):
+		sql = u"DROP VIEW %s" % self.quoteId(view)
 		self._execute_and_commit(sql)
-		return True
 	
-	def renameView(self, name, new_name, schema=None):
+	def renameView(self, view, new_name):
 		""" rename view """
-		return self.renameTable(name, new_name)
+		return self.renameTable(view, new_name)
 
 	def hasCustomQuerySupport(self):
 		from qgis.core import QGis
 		return QGis.QGIS_VERSION[0:3] >= "1.6"
+
 
 	def fieldTypes(self):
 		return [
@@ -418,43 +410,38 @@ class SpatiaLiteDBConnector(DBConnector):
 		]
 
 
-	def _execute(self, cursor, sql):
-		try:
-			cursor.execute(unicode(sql))
-		except (sqlite.OperationalError, sqlite.DatabaseError), e:
-			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
-			self.connection.rollback()
-			raise DbError(e, sql)
+	def _error_types(self):
+		return (sqlite.OperationalError, sqlite.DatabaseError)
+
+	# moved into the parent class: DbConnector._execute()
+	#def _execute(self, cursor, sql):
+	#	pass
 		
-	def _execute_and_commit(self, sql):
-		""" tries to execute and commit some action, on error it rolls back the change """
-		c = self.connection.cursor()
-		self._execute(c, sql)
-		self.connection.commit()
+	# moved into the parent class: DbConnector._execute_and_commit()
+	#def _execute_and_commit(self, sql):
+	#	pass
 
-	def _get_cursor(self, name=None):
-		if name:
-			name = QString( unicode(name).encode('ascii', 'replace') ).replace( QRegExp("\W"), "_" ).toAscii()
-			self._last_cursor_named_id = 0 if not hasattr(self, '_last_cursor_named_id') else self._last_cursor_named_id + 1
-			return self.connection.cursor( "%s_%d" % (name, self._last_cursor_named_id) )
-		return self.connection.cursor()
+	# moved into the parent class: DbConnector._get_cursor()
+	#def _get_cursor(self, name=None):
+	#	pass
 
-	def _fetchall(self, c):
-		try:
-			return c.fetchall()
-		except sqlite.OperationalError, e:
-			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
-			self.connection.rollback()
-			raise DbError(e)
+	# moved into the parent class: DbConnector._fetchall()
+	#def _fetchall(self, c):
+	#	pass
 
-	def _commit(self):
-		self.connection.commit()
+	# moved into the parent class: DbConnector._fetchone()
+	#def _fetchone(self, c):
+	#	pass
 
-	def _rollback(self):
-		self.connection.rollback()
+	# moved into the parent class: DbConnector._commit()
+	#def _commit(self):
+	#	pass
 
-	def _get_columns(self, c):
-		if c.description:
-			return map(lambda x: x[0], c.description)
-		return []
+	# moved into the parent class: DbConnector._rollback()
+	#def _rollback(self):
+	#	pass
+
+	# moved into the parent class: DbConnector._get_cursor_columns()
+	#def _get_cursor_columns(self, c):
+	#	pass
 

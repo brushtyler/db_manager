@@ -281,7 +281,7 @@ class TableInfo:
 	def getViewDefinition(self):
 		if not self.table.isView:
 			return None
-		return self.table.database().connector.getViewDefinition(self.table.name, self.table.schema().name if self.table.schema() else None)
+		return self.table.database().connector.getViewDefinition( (self.table.schemaName(), self.table.name) )
 
 
 	def getTableInfo(self):
@@ -383,7 +383,7 @@ class VectorTableInfo(TableInfo):
 
 		# estimated extent
 		if not self.table.isView:
-			extent = self.table.database().connector.getTableEstimatedExtent(self.table.geomColumn, self.table.name, self.table.schema().name if self.table.schema() else None)
+			extent = self.table.database().connector.getTableEstimatedExtent(self.table.geomColumn, (self.table.schemaName(), self.table.name) )
 			if extent != None and extent[0] != None:
 				extent = '%.5f, %.5f - %.5f, %.5f' % extent
 			else:
@@ -434,7 +434,7 @@ class RasterTableInfo(TableInfo):
 
 		# estimated extent
 		if not self.table.isView:
-			extent = self.table.database().connector.getTableEstimatedExtent(self.table.geomColumn, self.table.name, self.table.schemaName())
+			extent = self.table.database().connector.getTableEstimatedExtent(self.table.geomColumn, (self.table.schemaName(), self.table.name) )
 			if extent != None and extent[0] != None:
 				extent = '%.5f, %.5f - %.5f, %.5f' % extent
 			else:

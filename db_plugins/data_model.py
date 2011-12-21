@@ -122,7 +122,7 @@ class SqlResultModel(BaseTableModel):
 		self._affectedRows = 0
 		data = []
 		try:
-			header = self.db._get_columns(c)
+			header = self.db._get_cursor_columns(c)
 			if len(header) > 0:
 				data = self.db._fetchall(c)
 			self._affectedRows = c.rowcount
@@ -163,6 +163,17 @@ class SimpleTableModel(QStandardItemModel):
 			return QVariant(self.header[section])
 		return QVariant()
 
+	def _getNewObject(self):
+		pass
+
+	def getObject(self, row):
+		return self._getNewObject()
+
+	def getObjectIter(self):
+		for row in range(self.rowCount()):
+			yield self.getObject(row)
+
+
 
 class TableFieldsModel(SimpleTableModel):
 	def __init__(self, parent):
@@ -174,49 +185,101 @@ class TableFieldsModel(SimpleTableModel):
 		return SimpleTableModel.headerData(self, section, orientation, role)
 
 
-	def appendField(self, fld):
+	def append(self, fld):
 		data = [fld.name, fld.type2String(), not fld.notNull, fld.default2String()]
 		self.appendRow( self.rowFromData(data) )
 		row = self.rowCount()-1
-		self.setData(self.index(row, 0), QVariant(fld.primaryKey), Qt.UserRole)
+		self.setData(self.index(row, 0), QVariant(fld), Qt.UserRole)
+		self.setData(self.index(row, 1), QVariant(fld.primaryKey), Qt.UserRole)
+
+	def _getNewObject(self):
+		from .plugin import TableField
+		return TableField(None)
+
+	def getObject(self, row):
+		val = self.data(self.index(row, 0), Qt.UserRole)
+		fld = val.toPyObject() if val.isValid() else self._getNewObject()
+		fld.name = self.data(self.index(row, 0)).toString()
+
+		typestr = self.data(self.index(row, 1)).toString()
+		regex = QRegExp( "([^\(]+)\(([^\)]+)\)" )
+		startpos = regex.indexIn( QString(typestr) )
+		if startpos >= 0:
+			fld.dataType = regex.cap(1).trimmed()
+			fld.modifier = regex.cap(2).trimmed()
+		else:
+			fld.modifier = None
+			fld.dataType = typestr
+
+		fld.notNull = not self.data(self.index(row, 2)).toBool()
+		fld.primaryKey = self.data(self.index(row, 1), Qt.UserRole).toBool()
+		return fld
 
 	def getFields(self):
-		from .plugin import TableField
 		flds = []
-		for row in range(self.rowCount()):
-			fld = TableField(None)
-			fld.name = self.data(self.index(row, 0)).toString()
-			fld.dataType = self.data(self.index(row, 1)).toString()
-			fld.notNull = not self.data(self.index(row, 2)).toBool()
-			fld.primaryKey = self.data(self.index(row, 0), Qt.UserRole).toBool()
+		for fld in self.getObjectIter():
 			flds.append( fld )
 		return flds
 
 
 class TableConstraintsModel(SimpleTableModel):
 	def __init__(self, parent):
-		SimpleTableModel.__init__(self, parent, ['Name', 'Type', 'Column(s)'])
+		SimpleTableModel.__init__(self, ['Name', 'Type', 'Column(s)'], parent)
 
-	def appendConstraint(self, constr):
-		field_names = map( lambda x,y: y.name, constr.fields() )
-		self.appendData( [constr.name, constr.type2String(), u", ".join(field_names)] )
+	def append(self, constr):
+		field_names = map( lambda (k,v): unicode(v.name), constr.fields().iteritems() )
+		data = [constr.name, constr.type2String(), u", ".join(field_names)]
+		self.appendRow( self.rowFromData(data) )
+		row = self.rowCount()-1
+		self.setData(self.index(row, 0), QVariant(constr), Qt.UserRole)		
+		self.setData(self.index(row, 1), QVariant(constr.type), Qt.UserRole)
+		self.setData(self.index(row, 2), QVariant(constr.columns), Qt.UserRole)
 
-	def getConstraints(self, db):
+	def _getNewObject(self):
 		from .plugin import TableConstraint
+		return TableConstraint(None)
+
+	def getObject(self, row):
+		val = self.data(self.index(row, 0), Qt.UserRole)
+		constr = val.toPyObject() if val.isValid() else self._getNewObject()
+		constr.name = self.data(self.index(row, 0)).toString()
+		constr.type = self.data(self.index(row, 1), Qt.UserRole).toInt()[0]
+		constr.columns = self.data(self.index(row, 2), Qt.UserRole).toList()
+		return constr
+
+	def getConstraints(self):
 		constrs = []
-		for row in range(self.rowCount()):
-			constr = TableConstraint(None, db)
-			constr.name = self.data(self.index(row, 0)).toString()
-			constr.type = self.data(self.index(row, 1)).toString()
+		for constr in self.getObjectIter():
 			constrs.append( constr )
 		return constrs
 
 
 class TableIndexesModel(SimpleTableModel):
 	def __init__(self, parent):
-		SimpleTableModel.__init__(self, parent, ['Name', 'Column(s)'])
+		SimpleTableModel.__init__(self, ['Name', 'Column(s)'], parent)
 
-	def appendIndex(self, idx):
-		field_names = map( lambda x,y: y.name, idx.fields() )
-		self.appendData( [idx.name, u", ".join(field_names)] )
+	def append(self, idx):
+		field_names = map( lambda (k,v): unicode(v.name), idx.fields().iteritems() )
+		data = [idx.name, u", ".join(field_names)]
+		self.appendRow( self.rowFromData(data) )
+		row = self.rowCount()-1
+		self.setData(self.index(row, 0), QVariant(idx), Qt.UserRole)		
+		self.setData(self.index(row, 1), QVariant(idx.columns), Qt.UserRole)
+
+	def _getNewObject(self):
+		from .plugin import TableIndex
+		return TableIndex(None)
+
+	def getObject(self, row):
+		val = self.data(self.index(row, 0), Qt.UserRole)
+		idx = val.toPyObject() if val.isValid() else self._getNewObject()
+		idx.name = self.data(self.index(row, 0)).toString()
+		idx.columns = self.data(self.index(row, 1), Qt.UserRole).toList()
+		return idx
+
+	def getIndexes(self):
+		idxs = []
+		for idx in self.getObjectIter():
+			idxs.append( idx )
+		return idxs
 

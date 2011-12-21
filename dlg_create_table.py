@@ -95,7 +95,7 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 			self.db = self.item.database()
 			self.schemas = self.db.schemas()
 			self.hasSchemas = self.schemas != None
-			self.fieldTypes = self.db.connector.fieldTypes()			
+			self.fieldTypes = self.db.connector.fieldTypes()
 
 		m = TableFieldsModel(self)
 		self.fields.setModel(m)
@@ -137,7 +137,7 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 		for schema in self.schemas:
 			self.cboSchema.addItem(schema.name)
 			if hasattr(self.item, 'schema') and schema.name == self.item.schema().name:
-					index = self.cboSchema.count()-1
+				index = self.cboSchema.count()-1
 		self.cboSchema.setCurrentIndex(index)
 
 	def hideSchemas(self):
@@ -301,27 +301,23 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 			# commit to DB
 			QApplication.setOverrideCursor(Qt.WaitCursor)
 			try:
-				self.db.connector.createTable(table, flds, schema)
-				if useGeomColumn:
-					self.db.connector.addGeometryColumn(table, geomType, schema, geomColumn, geomSrid, geomDim)
-
-					# commit data definition changes, otherwise index can't be built
-					self.db.connector.connection.commit()
-
-					if useSpatialIndex:
-						self.db.connector.createSpatialIndex(table, schema, geomColumn)
+				if not useGeomColumn:
+					self.db.createTable(table, flds, schema)
+				else:
+					geom = geomColumn, geomType, geomSrid, geomDim, useSpatialIndex
+					self.db.createVectorTable(table, flds, geom, schema)
 
 			except DbError, e:
 				DlgDbError.showError(e, self)
 				return
 
 			finally:
-				self.db.emit(SIGNAL("changed"))
 				QApplication.restoreOverrideCursor()
 
 		else:
 			print "table:", table
 			print "fields:", u", ".join(map(lambda x: x.definitions(), flds))
+			print "pk:", map(lambda x: x.name, filter(lambda x: x.primaryKey, flds))
 			if useGeomColumn:
 				print "geom:", geomType, " >> ", geomColumn
 
