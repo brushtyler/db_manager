@@ -2,6 +2,7 @@ DB Manager TODO and DONE list.
 
 
 DONE:
+* GUI to import data by drag'n'drop (v.0.1.8)
 * edit table (v0.1.8)
 * create table (v0.1.7)
 * display schemas and tables comments (v0.1.6)
@@ -13,7 +14,7 @@ DONE:
 TODO:
 - PGManager
     * versioning
-    * GUI to import/export data
+    * GUI to import/export data (from shapefiles)
 - RT_Sql_Layer
     * query builder
     * query manager
