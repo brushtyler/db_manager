@@ -2,6 +2,7 @@ DB Manager TODO and DONE list.
 
 
 DONE:
+* edit table (v0.1.8)
 * create table (v0.1.7)
 * display schemas and tables comments (v0.1.6)
 * SQL syntax highlighting (v0.1.5)
@@ -11,7 +12,6 @@ DONE:
 
 TODO:
 - PGManager
-    * edit table
     * versioning
     * GUI to import/export data
 - RT_Sql_Layer
