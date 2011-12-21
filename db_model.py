@@ -537,8 +537,9 @@ class DBModel(QAbstractItemModel):
 				sql = inLayer.subsetString()
 
 				if providerKey == 'ogr':
-					# TODO: ask for pk and geom field name
-					geomCol = "the_geom" if inLayer.hasGeometryType() else QString()
+					# default pk and geom field name value
+					pkCol = "gid" if inLayer.hasGeometryType() else "pk"
+					geomCol = "geom" if inLayer.hasGeometryType() else QString()
 
 				elif providerKey in ['postgres', 'spatialite']:
 					inUri = qgis.core.QgsDataSourceURI( inLayer.source() )

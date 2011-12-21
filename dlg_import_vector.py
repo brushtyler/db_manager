@@ -60,7 +60,7 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 		pk = self.outUri.keyColumn()
 		self.editPrimaryKey.setText(pk if pk != "" else "pk")
 		geom = self.outUri.geometryColumn()
-		self.editGeomColumn.setText(geom if geom != "" else "the_geom")
+		self.editGeomColumn.setText(geom if geom != "" else "geom")
 		inCrs = self.inLayer.crs()
 		srid = inCrs.postgisSrid() if inCrs.isValid() else 4236
 		self.editSourceSrid.setText( "%s" % srid )
