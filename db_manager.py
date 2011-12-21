@@ -136,14 +136,21 @@ class DBManager(QMainWindow):
 			self._registeredDbActions = []
 
 		invoke_callback = lambda x: self.__invokeCallback( callback )
+		if menu == None or menu == "":
+			self.addAction( action )
+			self._registeredDbActions.append( (action, menu) )
+			QObject.connect( action, SIGNAL("triggered(bool)"), invoke_callback )
+			return True
+
 		for a in self.menuBar.actions():
 			if not a.menu() or a.menu().title() != menu:
 				continue
 			a.menu().addAction( action )
-			self._registeredDbActions.append( (action, menu) )
 			a.setVisible(True)	# show the menu
+			self._registeredDbActions.append( (action, menu) )
 			QObject.connect( action, SIGNAL("triggered(bool)"), invoke_callback )
 			return True
+
 		return False
 
 	def __invokeCallback(self, callback):
@@ -158,16 +165,24 @@ class DBManager(QMainWindow):
 		if not hasattr(self, '_registeredDbActions'):
 			return
 
+		if menu == None or menu == "":
+			self.removeAction( action )
+			if self._registeredDbActions.count( (action, menu) ) > 0:
+				self._registeredDbActions.remove( (action, menu) )
+			action.deleteLater()
+			return True
+
 		for a in self.menuBar.actions():
 			if not a.menu() or a.menu().title() != menu:
 				continue
 			a.menu().removeAction( action )
+			if a.menu().isEmpty():	# hide the menu
+				a.setVisible(False)
 			if self._registeredDbActions.count( (action, menu) ) > 0:
 				self._registeredDbActions.remove( (action, menu) )
 			action.deleteLater()
-			if a.menu().isEmpty():	# hide the menu
-				a.setVisible(False)
 			return True
+
 		return False
 
 	def unregisterAllActions(self):

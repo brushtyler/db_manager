@@ -211,6 +211,10 @@ class Database(DbItemObject):
 			action = QAction("&Delete (empty) schema", self)
 			mainWindow.registerAction( action, "&Schema", self.deleteSchemaActionSlot )
 
+		action = QAction("Delete selected item", self)
+		mainWindow.registerAction( action, None, self.deleteActionSlot )
+		action.setShortcuts(QKeySequence.Delete)
+
 		action = QAction(QIcon(":/db_manager/actions/create_table"), "&Create table", self)
 		mainWindow.registerAction( action, "&Table", self.createTableActionSlot )
 		action = QAction(QIcon(":/db_manager/actions/edit_table"), "&Edit table", self)
@@ -219,6 +223,14 @@ class Database(DbItemObject):
 		mainWindow.registerAction( action, "&Table", self.deleteTableActionSlot )
 		action = QAction("&Empty table", self)
 		mainWindow.registerAction( action, "&Table", self.emptyTableActionSlot )
+
+	def deleteActionSlot(self, item, action, parent):
+		if isinstance(item, Schema):
+			self.deleteSchemaActionSlot(item, action, parent)
+		elif isinstance(item, Table):
+			self.deleteTableActionSlot(item, action, parent)
+		else:
+			QMessageBox.information(parent, "Sorry", "Cannot delete the selected item.")
 
 	def createSchemaActionSlot(self, item, action, parent):
 		if not isinstance(item, (DBPlugin, Schema, Table)) or item.database() == None:
