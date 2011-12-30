@@ -157,15 +157,17 @@ class SqlResultModel(BaseTableModel):
 
 
 class SimpleTableModel(QStandardItemModel):
-	def __init__(self, header, parent=None):
+	def __init__(self, header, editable=False, parent=None):
 		self.header = header
+		self.editable = editable
 		QStandardItemModel.__init__(self, 0, len(self.header), parent)
 
-	@classmethod
 	def rowFromData(self, data):
 		row = []
 		for c in data:
-			row.append( QStandardItem(unicode(c)) )
+			item = QStandardItem(unicode(c))
+			item.setFlags( (item.flags() | Qt.ItemIsEditable) if self.editable else (item.flags() & ~Qt.ItemIsEditable) )
+			row.append( item )
 		return row
 
 	def headerData(self, section, orientation, role):
@@ -186,14 +188,13 @@ class SimpleTableModel(QStandardItemModel):
 
 
 class TableFieldsModel(SimpleTableModel):
-	def __init__(self, parent):
-		SimpleTableModel.__init__(self, ['Name', 'Type', 'Null', 'Default'], parent)
+	def __init__(self, parent, editable=False):
+		SimpleTableModel.__init__(self, ['Name', 'Type', 'Null', 'Default'], editable, parent)
 
 	def headerData(self, section, orientation, role):
 		if orientation == Qt.Vertical and role == Qt.DisplayRole:
 			return QVariant(section+1)
 		return SimpleTableModel.headerData(self, section, orientation, role)
-
 
 	def append(self, fld):
 		data = [fld.name, fld.type2String(), not fld.notNull, fld.default2String()]
@@ -233,8 +234,8 @@ class TableFieldsModel(SimpleTableModel):
 
 
 class TableConstraintsModel(SimpleTableModel):
-	def __init__(self, parent):
-		SimpleTableModel.__init__(self, ['Name', 'Type', 'Column(s)'], parent)
+	def __init__(self, parent, editable=False):
+		SimpleTableModel.__init__(self, ['Name', 'Type', 'Column(s)'], editable, parent)
 
 	def append(self, constr):
 		field_names = map( lambda (k,v): unicode(v.name), constr.fields().iteritems() )
@@ -265,8 +266,8 @@ class TableConstraintsModel(SimpleTableModel):
 
 
 class TableIndexesModel(SimpleTableModel):
-	def __init__(self, parent):
-		SimpleTableModel.__init__(self, ['Name', 'Column(s)'], parent)
+	def __init__(self, parent, editable=False):
+		SimpleTableModel.__init__(self, ['Name', 'Column(s)'], editable, parent)
 
 	def append(self, idx):
 		field_names = map( lambda (k,v): unicode(v.name), idx.fields().iteritems() )

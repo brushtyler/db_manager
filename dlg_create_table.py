@@ -97,7 +97,7 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 			self.hasSchemas = self.schemas != None
 			self.fieldTypes = self.db.connector.fieldTypes()
 
-		m = TableFieldsModel(self)
+		m = TableFieldsModel(self, True)	# it's editable
 		self.fields.setModel(m)
 		self.fields.setColumnHidden(3, True)	# hide Default column
 		
@@ -281,6 +281,10 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 		useGeomColumn = self.chkGeomColumn.isChecked()
 		if useGeomColumn:
 			geomColumn = unicode(self.editGeomColumn.text())
+			if len(geomColumn) == 0:
+				QMessageBox.information(self, "sorry", "set geometry column name")
+				return
+
 			geomType = str(self.cboGeomType.currentText())
 			geomDim = self.spinGeomDim.value()
 			try:
@@ -288,9 +292,6 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 			except ValueError:
 				geomSrid = -1
 			useSpatialIndex = self.chkSpatialIndex.isChecked()
-			if len(geomColumn) == 0:
-				QMessageBox.information(self, "sorry", "set geometry column name")
-				return
 
 		flds = m.getFields()
 		pk_index = self.cboPrimaryKey.currentIndex()
