@@ -30,6 +30,16 @@ class BaseTableModel(QAbstractTableModel):
 		self._header = header if header else []
 		self.resdata = data if data else []
 
+	def headerToString(self, sep=u"\t"):
+		header = QStringList() << self._header
+		return header.join( sep )
+
+	def rowToString(self, row, sep=u"\t"):
+		text = QString()
+		for col in range(self.columnCount()):
+			text += u"%s" % self.getData(row, col) + sep
+		return text[:-1]
+
 	def getData(self, row, col):
 		return self.resdata[row][col]
 

@@ -47,6 +47,12 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 
 		self.editSql.setAcceptRichText(False)
 		SqlHighlighter(self.editSql).load(self.db)
+
+		# allow to copy results
+		copyAction = QAction("copy", self)
+		self.viewResult.addAction( copyAction )
+		copyAction.setShortcuts(QKeySequence.Copy)
+		QObject.connect(copyAction, SIGNAL("triggered()"), self.copySelectedResults)
 		
 		self.connect(self.btnExecute, SIGNAL("clicked()"), self.executeSql)
 		self.connect(self.btnClear, SIGNAL("clicked()"), self.clearSql)
@@ -190,4 +196,17 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 		self.geomCombo.addItems( cols )
 
 		QApplication.restoreOverrideCursor()
+
+	def copySelectedResults(self):
+		if len(self.viewResult.selectedIndexes()) <= 0:
+			return
+		model = self.viewResult.model()
+
+		# convert to string using tab as separator
+		text = model.headerToString( "\t" )
+		for idx in self.viewResult.selectionModel().selectedRows():
+			text += "\n" + model.rowToString( idx.row(), "\t" )
+
+		QApplication.clipboard().setText( text, QClipboard.Selection )
+		QApplication.clipboard().setText( text, QClipboard.Clipboard )
 
