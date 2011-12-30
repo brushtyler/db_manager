@@ -37,7 +37,10 @@ class DBManagerPlugin:
 		self.action = QAction( QIcon(":/db_manager/icon"), u"DB Manager", self.iface.mainWindow() )
 		QObject.connect( self.action, SIGNAL( "triggered()" ), self.run )
 		# Add toolbar button and menu item
-		self.iface.addToolBarIcon(self.action)
+		if hasattr( self.iface, 'addDatabaseToolBarIcon' ):
+			self.iface.addDatabaseToolBarIcon(self.action)
+		else:
+			self.iface.addToolBarIcon(self.action)
 		if hasattr( self.iface, 'addPluginToDatabaseMenu' ):
 			self.iface.addPluginToDatabaseMenu( u"DB Manager", self.action )
 		else:
@@ -49,7 +52,10 @@ class DBManagerPlugin:
 			self.iface.removePluginDatabaseMenu( u"DB Manager", self.action )
 		else:
 			self.iface.removePluginMenu( u"DB Manager", self.action )
-		self.iface.removeToolBarIcon(self.action)
+		if hasattr( self.iface, 'removeDatabaseToolBarIcon' ):
+			self.iface.removeDatabaseToolBarIcon(self.action)
+		else:
+			self.iface.removeToolBarIcon(self.action)
 		
 		if self.dlg != None:
 			self.dlg.close()
