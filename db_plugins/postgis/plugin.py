@@ -167,14 +167,14 @@ class PGTable(Table):
 
 	def runVacuumAnalyze(self):
 		self.database().connector.runVacuumAnalyze( (self.schemaName(), self.name) )
-		# TODO: change only this item, not re-create all the tables in the schema
-		self.schema().refresh()
+		# TODO: change only this item, not re-create all the tables in the schema/database
+		self.schema().refresh() if self.schema() else self.database().refresh()
 
 	def runAction(self, action):
 		action = unicode(action)
 
-		if action.startswith( "table/" ):
-			if action == "table/vacuum":
+		if action.startswith( "vacuumanalyze/" ):
+			if action == "vacuumanalyze/run":
 				self.runVacuumAnalyze()
 				return True
 
@@ -224,10 +224,16 @@ class PGVectorTable(PGTable, VectorTable):
 		PGTable.__init__(self, row[:-4], db, schema)
 		VectorTable.__init__(self, db, schema)
 		self.geomColumn, self.geomType, self.geomDim, self.srid = row[-4:]
+		self.estimatedExtent = self.database().connector.getTableEstimatedExtent( (self.schemaName(), self.name), self.geomColumn )
 
 	def info(self):
 		from .info_model import PGVectorTableInfo
 		return PGVectorTableInfo(self)
+
+	def runAction(self, action):
+		if PGTable.runAction(self, action):
+			return True
+		return VectorTable.runAction(self, action)
 
 class PGRasterTable(PGTable, RasterTable):
 	def __init__(self, row, db, schema=None):

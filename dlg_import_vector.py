@@ -42,10 +42,9 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 		self.setupUi(self)
 		
 		# updates of UI
-		for widget in [self.radCreate, self.radAppend, 
-						self.chkPrimaryKey, self.chkGeomColumn,
-						self.chkSourceSrid, self.chkTargetSrid, 
-						self.chkEncoding]:
+		for widget in [self.radCreate, self.chkDropTable, self.radAppend, 
+						self.chkPrimaryKey, self.chkGeomColumn, self.chkSpatialIndex, 
+						self.chkSourceSrid, self.chkTargetSrid, self.chkEncoding]:
 			self.connect(widget, SIGNAL("clicked()"), self.updateUi)
 
 		self.connect(self.cboSchema, SIGNAL("currentIndexChanged(int)"), self.populateTables)
@@ -66,6 +65,16 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 		self.editSourceSrid.setText( "%s" % srid )
 		self.editTargetSrid.setText( "%s" % srid )
 
+		self.checkSupports()
+
+
+	def checkSupports(self):
+		allowSpatial = self.db.connector.hasSpatialSupport()
+		self.chkGeomColumn.setEnabled(allowSpatial)
+		self.chkSourceSrid.setEnabled(allowSpatial)
+		self.chkTargetSrid.setEnabled(allowSpatial)
+		self.chkSpatialIndex.setEnabled(allowSpatial)
+	
 		
 	def populateSchemas(self):
 		if not self.db:
@@ -112,7 +121,7 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 		for enc in encodings:
 			self.cboEncoding.addItem(enc)
 		self.cboEncoding.setCurrentIndex(2)
-	
+
 	def updateUi(self):
 		allowDropTable = self.radCreate.isChecked()
 		self.chkDropTable.setEnabled(allowDropTable)
@@ -183,8 +192,9 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 			QMessageBox.warning(self, "Error [%d]" % ret, errMsg )
 			return self.reject()
 
-		if self.chkSpatialIndex.isChecked():
+		if self.chkGeomColumn.isChecked() and self.chkSpatialIndex.isChecked():
 			self.db.connector.createSpatialIndex( (schema, table), geom )
+
 		QMessageBox.information(self, "Good", "Everything went fine")
 		return self.accept()
 

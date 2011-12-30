@@ -273,7 +273,7 @@ class Database(DbItemObject):
 		DlgCreateTable(item, parent).exec_()
 
 	def editTableActionSlot(self, item, action, parent):
-		if not isinstance(item, Table):
+		if not isinstance(item, Table) or item.isView:
 			QMessageBox.information(parent, "Sorry", "Select a TABLE for editation.")
 			return
 		from ..dlg_table_properties import DlgTableProperties
@@ -342,7 +342,7 @@ class Database(DbItemObject):
 				geomCol, geomType, geomSrid, geomDim = geom[:4]
 				createSpatialIndex = geom[4] == True if len(geom) > 4 else False
 
-				self.connector.addGeometryColumn( (schema, table), geomType, geomCol, geomSrid, geomDim)
+				self.connector.addGeometryColumn( (schema, table), geomCol, geomType, geomSrid, geomDim )
 
 				if createSpatialIndex:
 					# commit data definition changes, otherwise index can't be built
@@ -520,14 +520,8 @@ class Table(DbItemObject):
 			self.refreshFields()
 		return ret
 
-	def renameField(self, fld, new_name):
-		ret = self.database().connector.renameTableColumn( (self.schemaName(), self.name), fld.name, new_name)
-		if ret != False:
-			self.refreshFields()
-		return ret
-
 	def addGeometryColumn(self, geomCol, geomType, srid, dim, createSpatialIndex=False):
-		ret = self.database().connector.addGeometryColumn( (self.schemaName(), self.name), geomType, geomCol, srid, dim)
+		ret = self.database().connector.addGeometryColumn( (self.schemaName(), self.name), geomCol, geomType, srid, dim)
 		if ret == False:
 			return False
 
@@ -538,7 +532,7 @@ class Table(DbItemObject):
 				self.database().connector.createSpatialIndex( (self.schemaName(), self.name), geomCol)
 
 		finally:
-			self.schema().refreshTables()	# another table was added to the schema
+			self.schema().refresh() if self.schema() else self.database().refresh()	# another table was added
 		return True
 
 
@@ -589,7 +583,7 @@ class Table(DbItemObject):
 		self.refresh()
 
 	def addIndex(self, idx):
-		ret = self.database().connector.addTableIndex( (self.schemaName(), self.name), idx.name, idx.fields()[idx.columns[0]].name)
+		ret = self.database().connector.createTableIndex( (self.schemaName(), self.name), idx.name, idx.fields()[idx.columns[0]].name)
 		if ret != False:
 			self.refreshIndexes()
 		return ret
@@ -639,6 +633,13 @@ class Table(DbItemObject):
 			self.rowCount = None
 		self.refresh()
 
+	def refreshTableExtent(self):
+		try:
+			self.extent = self.database().connector.getTableExtent( (self.schemaName(), self.name), self.geomColumn )
+		except DbError:
+			self.extent = None
+		self.refresh()
+
 
 	def runAction(self, action):
 		action = unicode(action)
@@ -682,6 +683,17 @@ class Table(DbItemObject):
 				self.refreshTriggers()
 				return True
 
+		if action.startswith( "vacuum/" ):
+			if action == "vacuum/run":
+				self.database().connector.runVacuum()
+				self.database().refresh()
+				return True
+
+		if action.startswith( "extent/" ):
+			if action == "extent/get":
+				self.refreshTableExtent()
+				return True
+
 		return False
 
 class VectorTable(Table):
@@ -690,16 +702,59 @@ class VectorTable(Table):
 			Table.__init__(self, db, schema, parent)
 		self.type = Table.VectorType
 		self.geomColumn = self.geomType = self.geomDim = self.srid = None
+		self.estimatedExtent = self.extent = None
 
 	def info(self):
 		from .info_model import VectorTableInfo
 		return VectorTableInfo(self)
 
-	def createSpatialIndex(self, geom_column):
+	def hasSpatialIndex(self, geom_column=None):
+		geom_column = geom_column if geom_column != None else self.geomColumn
+		fld = None
+		for fld in self.fields():
+			if fld.name == geom_column:
+				break
+		if fld == None:
+			return False
+
+		for idx in self.indexes():
+			if fld.num in idx.columns:
+				return True
+		return False
+
+	def createSpatialIndex(self, geom_column=None):
+		geom_column = geom_column if geom_column != None else self.geomColumn
 		ret = self.database().connector.createSpatialIndex( (self.schemaName(), self.name), geom_column)
 		if ret != False:
 			self.refreshIndexes()
 		return ret
+
+	def deleteSpatialIndex(self, geom_column=None):
+		geom_column = geom_column if geom_column != None else self.geomColumn
+		ret = self.database().connector.deleteSpatialIndex( (self.schemaName(), self.name), geom_column)
+		if ret != False:
+			self.refreshIndexes()
+		return ret
+
+	def runAction(self, action):
+		action = unicode(action)
+
+		if action.startswith( "spatialindex/" ):
+			parts = action.split('/')
+			spatialIndex_action = parts[1]
+
+			msg = u"Do you want to %s spatial index for field %s?" % ( spatialIndex_action, self.geomColumn )
+			if QMessageBox.question(None, "Spatial Index", msg, QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
+				return False
+
+			if spatialIndex_action == "create":
+				self.createSpatialIndex()
+				return True
+			elif spatialIndex_action == "delete":
+				self.deleteSpatialIndex()
+				return True
+
+		return Table.runAction(self, action)
 
 class RasterTable(Table):
 	def __init__(self, db, schema=None, parent=None):
@@ -707,6 +762,7 @@ class RasterTable(Table):
 			Table.__init__(self, db, schema, parent)
 		self.type = Table.RasterType
 		self.geomColumn = self.geomType = self.pixelSizeX = self.pixelSizeY = self.pixelType = self.isExternal = self.srid = None
+		self.extent = None
 
 	def info(self):
 		from .info_model import RasterTableInfo
@@ -756,7 +812,19 @@ class TableField(TableSubItemObject):
 		return self.table().deleteField(self)
 
 	def rename(self, new_name):
-		return self.table().renameField(self, new_name)
+		return self.update(new_name)
+
+	def update(self, new_name, new_type_str=None, new_not_null=None, new_default_str=None):
+		if self.name == new_name: new_name = None
+		if self.type2String() == new_type_str: new_type_str = None
+		if self.notNull == new_not_null: new_not_null = None
+		if self.default2String() == new_default_str: new_default_str = None
+
+		ret = self.table().database().connector.updateTableColumn( (self.table().schemaName(), self.table().name), self.name, new_name, new_type_str, new_not_null, new_default_str)
+		if ret != False:
+			self.table().refreshFields()
+		return ret
+
 
 class TableConstraint(TableSubItemObject):
 	""" class that represents a constraint of a table (relation) """

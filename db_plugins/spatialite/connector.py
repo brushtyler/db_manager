@@ -102,6 +102,28 @@ class SpatiaLiteDBConnector(DBConnector):
 
 		return c.fetchone()
 
+	def hasSpatialSupport(self):
+		return self.has_spatial
+
+	def hasRasterSupport(self):
+		return self.has_raster
+
+	def hasCustomQuerySupport(self):
+		from qgis.core import QGis
+		return QGis.QGIS_VERSION[0:3] >= "1.6"
+
+	def hasTableColumnEditingSupport(self):
+		return False
+
+
+	def fieldTypes(self):
+		return [
+			"integer", "bigint", "smallint", # integers
+			"real", "double", "float", "numeric", # floats
+			"varchar(n)", "character(n)", "text", # strings
+			"date", "datetime" # date/time
+		]
+
 
 	def getSchemas(self):
 		return None
@@ -118,19 +140,25 @@ class SpatiaLiteDBConnector(DBConnector):
 				"pattern_bitmaps","symbol_bitmaps", "project_defs", "raster_pyramids", 
 				"sqlite_stat1", "sqlite_stat2", "spatialite_history" ]
 
-		vectors = self.getVectorTables(schema)
-		for tbl in vectors:
-			if tbl[1] in sys_tables:
-				continue
-			tablenames.append( tbl[1] )
-			items.append( tbl )
+		try:
+			vectors = self.getVectorTables(schema)
+			for tbl in vectors:
+				if tbl[1] in sys_tables:
+					continue
+				tablenames.append( tbl[1] )
+				items.append( tbl )
+		except DbError:
+			pass
 
-		rasters = self.getRasterTables(schema)
-		for tbl in rasters:
-			if tbl[1] in sys_tables:
-				continue
-			tablenames.append( tbl[1] )
-			items.append( tbl )
+		try:
+			rasters = self.getRasterTables(schema)
+			for tbl in rasters:
+				if tbl[1] in sys_tables:
+					continue
+				tablenames.append( tbl[1] )
+				items.append( tbl )
+		except DbError:
+			pass
 
 		c = self.connection.cursor()
 
@@ -278,20 +306,18 @@ class SpatiaLiteDBConnector(DBConnector):
 		self._execute_and_commit(sql)
 
 
-	def getTableEstimatedExtent(self, geom, table):
-		""" find out estimated extent (from the statistics) """
+	def getTableExtent(self, table, geom):
+		""" find out table extent """
+		schema, tablename = self.getSchemaTableName(table)
 		c = self.connection.cursor()
 
 		if self.isRasterTable(table):
-			table = QString(table).replace('_rasters', '_metadata')
+			tablename = QString(tablename).replace('_rasters', '_metadata')
 			geom = u'geometry'
 
 		sql = u"""SELECT Min(MbrMinX(%(geom)s)), Min(MbrMinY(%(geom)s)), Max(MbrMaxX(%(geom)s)), Max(MbrMaxY(%(geom)s)) 
-						FROM %(table)s """ % { 'geom' : self.quoteId(geom), 'table' : self.quoteId(table) }
-		try:
-			self._execute(c, sql)
-		except DbError, e:
-			return
+						FROM %(table)s """ % { 'geom' : self.quoteId(geom), 'table' : self.quoteId(tablename) }
+		self._execute(c, sql)
 		return c.fetchone()
 	
 	def getViewDefinition(self, view):
@@ -334,9 +360,22 @@ class SpatiaLiteDBConnector(DBConnector):
 		return False
 
 
-	# moved into the parent class: DbConnector.createTable()
-	#def createTable(self, table, field_defs, pkey, schema=None):
-	#	pass
+	def createTable(self, table, field_defs, pkey):
+		""" create ordinary table
+				'fields' is array containing field definitions
+				'pkey' is the primary key name
+		"""
+		if len(field_defs) == 0:
+			return False
+
+		sql = "CREATE TABLE %s (" % self.quoteId(table)
+		sql += u", ".join( field_defs )
+		if pkey != None and pkey != "":
+			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkey)
+		sql += ")"
+
+		self._execute_and_commit(sql)
+		return True
 
 	def deleteTable(self, table):
 		""" delete table from the database """
@@ -396,18 +435,120 @@ class SpatiaLiteDBConnector(DBConnector):
 		""" rename view """
 		return self.renameTable(view, new_name)
 
-	def hasCustomQuerySupport(self):
-		from qgis.core import QGis
-		return QGis.QGIS_VERSION[0:3] >= "1.6"
+
+	def runVacuum(self):
+		""" run vacuum on the db """
+		self._execute_and_commit("VACUUM")
 
 
-	def fieldTypes(self):
-		return [
-			"integer", "bigint", "smallint", # integers
-			"real", "double", "float", "numeric", # floats
-			"varchar(n)", "character(n)", "text", # strings
-			"date", "datetime" # date/time
-		]
+	def addTableColumn(self, table, field_def):
+		""" add a column to table """
+		sql = u"ALTER TABLE %s ADD %s" % (self.quoteId(table), field_def)
+		self._execute_and_commit(sql)
+		
+	def deleteTableColumn(self, table, column):
+		""" delete column from a table """
+		if not self.isGeometryColumn(table, column):
+			return False	# column editing not supported
+
+		# delete geometry column correctly
+		schema, tablename = self.getSchemaTableName(table)
+		sql = u"SELECT DiscardGeometryColumn(%s, %s)" % (self.quoteString(tablename), self.quoteString(column))
+		self._execute_and_commit(sql)
+		
+	def updateTableColumn(self, table, column, new_name, new_data_type=None, new_not_null=None, new_default=None):
+		return False	# column editing not supported
+
+	def renameTableColumn(self, table, column, new_name):
+		""" rename column in a table """
+		return False	# column editing not supported
+
+	def setColumnType(self, table, column, data_type):
+		""" change column type """
+		return False	# column editing not supported
+		
+	def setColumnDefault(self, table, column, default):
+		""" change column's default value. If default=None drop default value """
+		return False	# column editing not supported
+		
+	def setColumnNull(self, table, column, is_null):
+		""" change whether column can contain null values """
+		return False	# column editing not supported
+
+	def isGeometryColumn(self, table, column):
+		c = self.connection.cursor()
+		schema, tablename = self.getSchemaTableName(table)
+		sql = u"SELECT count(*) > 0 FROM geometry_columns WHERE lower(f_table_name)=lower(%s) AND lower(f_geometry_column)=lower(%s)" % (self.quoteString(tablename), self.quoteString(column))
+		self._execute(c, sql)
+		return c.fetchone()[0] == 't'
+
+	def addGeometryColumn(self, table, geom_column='geometry', geom_type='POINT', srid=-1, dim=2):
+		schema, tablename = self.getSchemaTableName(table)
+		sql = u"SELECT AddGeometryColumn(%s, %s, %d, %s, %s)" % (self.quoteString(tablename), self.quoteString(geom_column), srid, self.quoteString(geom_type), dim)
+		self._execute_and_commit(sql)
+
+	def deleteGeometryColumn(self, table, geom_column):
+		return self.deleteTableColumn(table, geom_column)
+
+
+	def addTableUniqueConstraint(self, table, column):
+		""" add a unique constraint to a table """
+		return False	# constraints not supported
+
+	def deleteTableConstraint(self, table, constraint):
+		""" delete constraint in a table """
+		return False	# constraints not supported
+
+
+	def addTablePrimaryKey(self, table, column):
+		""" add a primery key (with one column) to a table """
+		sql = u"ALTER TABLE %s ADD PRIMARY KEY (%s)" % (self.quoteId(table), self.quoteId(column))
+		self._execute_and_commit(sql)
+
+
+	def createTableIndex(self, table, name, column, unique=False):
+		""" create index on one column using default options """
+		unique_str = u"UNIQUE" if unique else ""
+		sql = u"CREATE %s INDEX %s ON %s (%s)" % (unique_str, self.quoteId(name), self.quoteId(table), self.quoteId(column))
+		self._execute_and_commit(sql)
+		
+	def deleteTableIndex(self, table, name):
+		schema, tablename = self.getSchemaTableName(table)
+		sql = u"DROP INDEX %s" % self.quoteId( (schema, name) )
+		self._execute_and_commit(sql)
+
+	def createSpatialIndex(self, table, geom_column='geometry'):
+		if self.isRasterTable( table ):
+			return False
+
+		schema, tablename = self.getSchemaTableName(table)
+		sql = u"SELECT CreateSpatialIndex(%s, %s)" % (self.quoteString(tablename), self.quoteString(geom_column))
+		self._execute_and_commit(sql)
+			
+	def deleteSpatialIndex(self, table, geom_column='geometry'):
+		if self.isRasterTable( table ):
+			return False
+
+		schema, tablename = self.getSchemaTableName(table)
+		try:
+			sql = u"SELECT DiscardSpatialIndex(%s, %s)" % (self.quoteString(tablename), self.quoteString(geom_column))
+			self._execute_and_commit(sql)
+		except DbError:
+			sql = u"SELECT DeleteSpatialIndex(%s, %s)" % (self.quoteString(tablename), self.quoteString(geom_column))
+			self._execute_and_commit(sql)
+			# delete the index table
+			idx_table_name = u"idx_%s_%s" % (tablename, geom_column)
+			self.deleteTable(idx_table_name)
+
+	def hasSpatialIndex(self, table, geom_column='geometry'):
+		if not self.has_geometry_columns or self.isRasterTable( table ):
+			return False
+		c = self.connection.cursor()
+		schema, tablename = self.getSchemaTableName(table)
+		sql = u"SELECT spatial_index_enabled FROM geometry_columns WHERE f_table_name = %s AND f_geometry_column = %s" % (self.quoteString(tablename), self.quoteString(geom_column))
+		self._execute(c, sql)
+		row = c.fetchone()
+		return row != None and row[0] == 1
 
 
 	def _error_types(self):

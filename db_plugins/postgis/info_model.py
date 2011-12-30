@@ -63,7 +63,7 @@ class PGTableInfo(TableInfo):
 			if table_priv[0]:
 				privileges.append("select")
 
-				if self.table.rowCount == None or (isinstance(self.table.rowCount, int) and self.table.rowCount >= 0):
+				if self.table.rowCount == None or self.table.rowCount >= 0:
 					tbl.append( ("Rows (counted):", self.table.rowCount if self.table.rowCount != None else 'Unknown (<a href="action:rows/count">find out</a>)') )
 
 			if table_priv[1]: privileges.append("insert")
@@ -79,9 +79,12 @@ class PGTableInfo(TableInfo):
 				ret.append( HtmlParagraph( u"<warning> This user has read-only privileges." ) )
 
 		if not self.table.isView:
-			if self.table.rowCount != None and (self.table.estimatedRowCount > 2 * self.table.rowCount or self.table.estimatedRowCount * 2 < self.table.rowCount):
-				ret.append( HtmlParagraph( u"<warning> There's a significant difference between estimated and real row count. " \
-					'Consider running <a href="action:table/vacuum">VACUUM ANALYZE</a>.' ) )
+			if self.table.rowCount != None:
+				if abs(self.table.estimatedRowCount - self.table.rowCount) > 1 and \
+						(self.table.estimatedRowCount > 2 * self.table.rowCount or \
+						self.table.rowCount > 2 * self.table.estimatedRowCount):
+					ret.append( HtmlParagraph( u"<warning> There's a significant difference between estimated and real row count. " \
+						'Consider running <a href="action:vacuumanalyze/run">VACUUM ANALYZE</a>.' ) )
 
 		# primary key defined?
 		if not self.table.isView:

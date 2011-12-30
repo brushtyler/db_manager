@@ -47,7 +47,16 @@ class DBConnector:
 		return QgsDataSourceURI( publicUri )
 
 
+	def hasSpatialSupport(self):
+		return False
+
+	def hasRasterSupport(self):
+		return False
+
 	def hasCustomQuerySupport(self):
+		return False
+
+	def hasTableColumnEditingSupport(self):
 		return False
 
 
@@ -141,22 +150,4 @@ class DBConnector:
 			return (None, table[0])
 		else:
 			return (table[0], table[1])
-
-
-	def createTable(self, table, field_defs, pkey):
-		""" create ordinary table
-				'fields' is array containing field definitions
-				'pkey' is the primary key name
-		"""
-		if len(field_defs) == 0:
-			return False
-
-		sql = "CREATE TABLE %s (" % self.quoteId(table)
-		sql += u", ".join( field_defs )
-		if pkey != None and pkey != "":
-			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkey)
-		sql += ")"
-
-		self._execute_and_commit(sql)
-		return True
 

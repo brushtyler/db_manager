@@ -30,7 +30,7 @@ class SLTableDataModel(TableDataModel):
 	def __init__(self, table, parent=None):
 		TableDataModel.__init__(self, table, parent)
 
-		fields_txt = ", ".join(self.fields)
+		fields_txt = u", ".join(self.fields)
 		table_txt = self.db.quoteId( (self.table.schemaName(), self.table.name) )
 		
 		# run query and get results
@@ -48,7 +48,10 @@ class SLTableDataModel(TableDataModel):
 
 	def _sanitizeTableField(self, field):
 		# get fields, ignore geometry columns
-		if field.dataType.lower() == "geometry":
+		dataType = field.dataType.upper()
+		if dataType[:5] == "MULTI": dataType = dataType[5:]
+		if dataType[-10:] == "COLLECTION": dataType = dataType[:-10]
+		if dataType in ["POINT", "LINESTRING", "POLYGON", "GEOMETRY"]:
 			return u'GeometryType(%s)' % self.db.quoteId(field.name)
 		return self.db.quoteId(field.name)
 

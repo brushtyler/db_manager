@@ -383,12 +383,16 @@ class VectorTableInfo(TableInfo):
 
 		# estimated extent
 		if not self.table.isView:
-			extent = self.table.database().connector.getTableEstimatedExtent(self.table.geomColumn, (self.table.schemaName(), self.table.name) )
-			if extent != None and extent[0] != None:
-				extent = '%.5f, %.5f - %.5f, %.5f' % extent
-			else:
-				extent = '(unknown)'
-			tbl.append( ("Extent:", extent) )
+			if self.table.estimatedExtent != None and self.table.estimatedExtent[0] != None:
+				estimated_extent_str = '%.5f, %.5f - %.5f, %.5f' % self.table.estimatedExtent
+				tbl.append( ("Estimated extent:", estimated_extent_str) )
+
+		# extent
+		if self.table.extent != None and self.table.extent[0] != None:
+			extent_str = '%.5f, %.5f - %.5f, %.5f' % self.table.extent
+		else:
+			extent_str = '(unknown) (<a href="action:extent/get">find out</a>)'
+		tbl.append( ("Extent:", extent_str) )
 
 		ret.append( HtmlTable( tbl ) )
 
@@ -398,17 +402,8 @@ class VectorTableInfo(TableInfo):
 
 		# find out whether the geometry column has spatial index on it
 		if not self.table.isView:
-			has_spatial_index = False
-			for fld in self.table.fields():
-				if fld.name == self.table.geomColumn:
-					for idx in self.table.indexes():
-						if fld.num in idx.columns:
-							has_spatial_index = True
-							break
-					break
-
-			if not has_spatial_index:
-				ret.append( HtmlParagraph( u'<warning> No spatial index defined.' ) )
+			if not self.table.hasSpatialIndex():
+				ret.append( HtmlParagraph( u'<warning> No spatial index defined (<a href="action:spatialindex/create">create it</a>)' ) )
 
 		return ret
 
@@ -432,29 +427,13 @@ class RasterTableInfo(TableInfo):
 		if sr_info: 
 			tbl.append( ("Spatial ref:", u"%s (%d)" % (sr_info, srid)) )
 
-		# estimated extent
-		if not self.table.isView:
-			extent = self.table.database().connector.getTableEstimatedExtent(self.table.geomColumn, (self.table.schemaName(), self.table.name) )
-			if extent != None and extent[0] != None:
-				extent = '%.5f, %.5f - %.5f, %.5f' % extent
-			else:
-				extent = '(unknown)'
-			tbl.append( ("Extent:", extent) )
+		# extent
+		if self.table.extent != None and self.table.extent[0] != None:
+			extent_str = '%.5f, %.5f - %.5f, %.5f' % self.table.extent
+		else:
+			extent_str = '(unknown) (<a href="action:extent/get">find out</a>)'
+		tbl.append( ("Extent:", extent_str) )
 
 		ret.append( HtmlTable( tbl ) )
-
-		# find out whether the raster column has spatial index on it
-		if not self.table.isView:
-			has_spatial_index = False
-			for fld in self.table.fields():
-				if fld.name == self.table.geomColumn:
-					for idx in self.table.indexes():
-						if fld.num in idx.columns:
-							has_spatial_index = True
-							break
-					break
-
-			if not has_spatial_index:
-				ret.append( HtmlParagraph( u'<warning> No spatial index defined.' ) )
-
 		return ret
+

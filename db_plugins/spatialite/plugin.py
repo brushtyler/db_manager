@@ -139,6 +139,28 @@ class SLVectorTable(SLTable, VectorTable):
 		uri.setDataSource('', self.geomTableName, self.geomColumn, QString(), pk.name if pk else QString())
 		return uri
 
+	def hasSpatialIndex(self, geom_column=None):		
+		geom_column = geom_column if geom_column != None else self.geomColumn
+		return self.database().connector.hasSpatialIndex( (self.schemaName(), self.name), geom_column )
+		
+	def createSpatialIndex(self, geom_column=None):
+		ret = VectorTable.createSpatialIndex(self, geom_column)
+		if ret != False:
+			self.database().refresh()
+		return ret
+
+	def deleteSpatialIndex(self, geom_column=None):
+		ret = VectorTable.deleteSpatialIndex(self, geom_column)
+		if ret != False:
+			self.database().refresh()
+		return ret
+
+	def runAction(self, action):
+		if SLTable.runAction(self, action):
+			return True
+		return VectorTable.runAction(self, action)
+
+
 class SLRasterTable(SLTable, RasterTable):
 	def __init__(self, row, db, schema=None):
 		SLTable.__init__(self, row[:-3], db, schema)

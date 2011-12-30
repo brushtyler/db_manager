@@ -127,6 +127,30 @@ class PostGisDBConnector(DBConnector):
 
 		return c.fetchone()
 
+	def hasSpatialSupport(self):
+		return self.has_spatial
+
+	def hasRasterSupport(self):
+		return self.has_raster
+
+	def hasCustomQuerySupport(self):
+		from qgis.core import QGis
+		return QGis.QGIS_VERSION[0:3] >= "1.5"
+
+	def hasTableColumnEditingSupport(self):
+		return True
+
+
+	def fieldTypes(self):
+		return [
+			"integer", "bigint", "smallint", # integers
+			"serial", "bigserial", # auto-incrementing ints
+			"real", "double precision", "numeric", # floats
+			"varchar", "varchar(n)", "char(n)", "text", # strings
+			"date", "time", "timestamp" # date/time
+		]
+
+
 
 	def getDatabasePrivileges(self):
 		""" db privileges: (can create schemas, can create temp. tables) """
@@ -485,21 +509,28 @@ class PostGisDBConnector(DBConnector):
 		self._execute_and_commit(sql)
 
 
-	def getTableEstimatedExtent(self, geom, table):
-		""" find out estimated extent (from the statistics) """
+	def getTableExtent(self, table, geom):
+		""" find out table extent """
 		c = self.connection.cursor()
+		subquery = u"SELECT st_extent(%s) AS extent FROM %s" % ( self.quoteId(geom), self.quoteId(table) )
+		sql = u"SELECT st_xmin(extent), st_ymin(extent), st_xmax(extent), st_ymax(extent) FROM (%s) AS subquery" % subquery
+		self._execute(c, sql)
+		return c.fetchone()
 
-		schema, tablename = self.getSchemaTableName(table)
-		schema_part = u"%s, " % self.quoteString(schema) if schema is not None else ""
-
+	def getTableEstimatedExtent(self, table, geom):
+		""" find out estimated extent (from the statistics) """
 		if self.isRasterTable(table):
-			extent = u"estimated_extent(%s,%s,st_convexhull(%s))" % (schema_part, self.quoteString(tablename), self.quoteString(geom))
-		else:
-			extent = u"estimated_extent(%s,%s,%s)" % (schema_part, self.quoteString(tablename), self.quoteString(geom))
-		sql = u"""SELECT xmin(%(ext)s), ymin(%(ext)s), xmax(%(ext)s), ymax(%(ext)s) """ % { 'ext' : extent }
+			return
+
+		c = self.connection.cursor()
+		schema, tablename = self.getSchemaTableName(table)
+		schema_part = u"%s," % self.quoteString(schema) if schema is not None else ""
+
+		subquery = u"SELECT st_estimated_extent(%s%s,%s) AS extent" % (schema_part, self.quoteString(tablename), self.quoteString(geom))
+		sql = u"""SELECT st_xmin(extent), st_ymin(extent), st_xmax(extent), st_ymax(extent) FROM (%s) AS subquery """ % subquery
 		try:
 			self._execute(c, sql)
-		except DbError, e:
+		except DbError, e:	# no statistics for the current table
 			return
 		return c.fetchone()
 	
@@ -555,9 +586,22 @@ class PostGisDBConnector(DBConnector):
 		return False		
 
 
-	# moved into the parent class: DbConnector.createTable()
-	#def createTable(self, table, field_defs, pkey):
-	#	pass
+	def createTable(self, table, field_defs, pkey):
+		""" create ordinary table
+				'fields' is array containing field definitions
+				'pkey' is the primary key name
+		"""
+		if len(field_defs) == 0:
+			return False
+
+		sql = "CREATE TABLE %s (" % self.quoteId(table)
+		sql += u", ".join( field_defs )
+		if pkey != None and pkey != "":
+			sql += u", PRIMARY KEY (%s)" % self.quoteId(pkey)
+		sql += ")"
+
+		self._execute_and_commit(sql)
+		return True
 
 	def deleteTable(self, table):
 		""" delete table and its reference in either geometry_columns or raster_columns """
@@ -672,9 +716,9 @@ class PostGisDBConnector(DBConnector):
 		self._execute_and_commit(sql)
 
 
-	def hasCustomQuerySupport(self):
-		from qgis.core import QGis
-		return QGis.QGIS_VERSION[0:3] >= "1.5"
+	def runVacuum(self):
+		""" run vacuum on the db """
+		self._execute_and_commit("VACUUM")
 
 	def runVacuumAnalyze(self, table):
 		""" run vacuum analyze on a table """
@@ -686,18 +730,8 @@ class PostGisDBConnector(DBConnector):
 		self.connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
 
 
-	def fieldTypes(self):
-		return [
-			"integer", "bigint", "smallint", # integers
-			"serial", "bigserial", # auto-incrementing ints
-			"real", "double precision", "numeric", # floats
-			"varchar", "varchar(n)", "char(n)", "text", # strings
-			"date", "time", "timestamp" # date/time
-		]
-
-
 	def addTableColumn(self, table, field_def):
-		""" add a column to table (passed as TableField instance) """
+		""" add a column to table """
 		sql = u"ALTER TABLE %s ADD %s" % (self.quoteId(table), field_def)
 		self._execute_and_commit(sql)
 		
@@ -711,44 +745,61 @@ class PostGisDBConnector(DBConnector):
 		else:
 			sql = u"ALTER TABLE %s DROP %s" % (self.quoteId(table), self.quoteId(column))
 		self._execute_and_commit(sql)
-		
-	def renameTableColumn(self, table, name, new_name):
-		""" rename column in a table """
+
+	def updateTableColumn(self, table, column, new_name=None, data_type=None, not_null=None, default=None):
+		if new_name == None and data_type == None and not_null == None and default == None:
+			return
+
 		c = self.connection.cursor()
-		sql = u"ALTER TABLE %s RENAME %s TO %s" % (self.quoteId(table), self.quoteId(name), self.quoteId(new_name))
-		self._execute(c, sql)
-		
-		# update geometry_columns if postgis is enabled
-		if self.has_geometry_columns and not self.is_geometry_columns_view:
-			schema, tablename = self.getSchemaTableName(table)
-			schema_where = u" f_table_schema=%s AND " % self.quoteString(schema) if schema is not None else ""
-			sql = u"UPDATE geometry_columns SET f_geometry_column=%s WHERE %s f_table_name=%s AND f_geometry_column=%s" % (self.quoteString(new_name), schema_where, self.quoteString(tablename), self.quoteString(name))
+
+		# update column definition
+		col_actions = QStringList()
+		if data_type != None:
+			col_actions << u"TYPE %s" % data_type
+		if not_null != None: 
+			col_actions << (u"SET NOT NULL" if not_null else u"DROP NOT NULL")
+		if default != None:
+			if default and default != '':
+				col_actions << u"SET DEFAULT %s" % default
+			else:
+				col_actions << u"DROP DEFAULT"
+		if len(col_actions) > 0:
+			sql = u"ALTER TABLE %s" % self.quoteId(table)
+			alter_col_str = u"ALTER %s" % self.quoteId(column)
+			for a in col_actions:
+				sql += u" %s %s," % (alter_col_str, a)
+			self._execute(c, sql[:-1])
+
+		# rename the column
+		if new_name != None and new_name != column:
+			sql = u"ALTER TABLE %s RENAME %s TO %s" % (self.quoteId(table), self.quoteId(column), self.quoteId(new_name))
 			self._execute(c, sql)
+
+			# update geometry_columns if postgis is enabled
+			if self.has_geometry_columns and not self.is_geometry_columns_view:
+				schema, tablename = self.getSchemaTableName(table)
+				schema_where = u" f_table_schema=%s AND " % self.quoteString(schema) if schema is not None else ""
+				sql = u"UPDATE geometry_columns SET f_geometry_column=%s WHERE %s f_table_name=%s AND f_geometry_column=%s" % (self.quoteString(new_name), schema_where, self.quoteString(tablename), self.quoteString(name))
+				self._execute(c, sql)
 
 		self.connection.commit()
 
-	def setColumnType(self, table, column, data_type):
+	def renameTableColumn(self, table, column, new_name):
+		""" rename column in a table """
+		return self.updateTableColumn(table, column, new_name)
+		
+	def setTableColumnType(self, table, column, data_type):
 		""" change column type """
-		sql = u"ALTER TABLE %s ALTER %s TYPE %s" % (self.quoteId(table), self.quoteId(column), data_type)
-		self._execute_and_commit(sql)
+		return self.updateTableColumn(table, column, None, data_type)
 		
-	def setColumnDefault(self, table, column, default):
-		""" change column's default value. If default=None drop default value """
-		sql = u"ALTER TABLE %s ALTER %s" % (self.quoteId(table), self.quoteId(column))
-		if default:
-			sql += u"SET DEFAULT %s" % default
-		else:
-			sql += u"DROP DEFAULT"
-		self._execute_and_commit(sql)
-		
-	def setColumnNull(self, table, column, is_null):
+	def setTableColumnNull(self, table, column, is_null):
 		""" change whether column can contain null values """
-		sql = u"ALTER TABLE %s ALTER %s " % (self.quoteId(table), self.quoteId(column))
-		if is_null:
-			sql += "DROP NOT NULL"
-		else:
-			sql += "SET NOT NULL"
-		self._execute_and_commit(sql)
+		return self.updateTableColumn(table, column, None, None, not is_null)
+
+	def setTableColumnDefault(self, table, column, default):
+		""" change column's default value. 
+			If default=None or an empty string drop default value """
+		return self.updateTableColumn(table, column, None, None, None, default)
 
 
 	def isGeometryColumn(self, table, column):
@@ -761,13 +812,15 @@ class PostGisDBConnector(DBConnector):
 		self._execute(c, sql)
 		return c.fetchone()[0] == 't'
 
-	def addGeometryColumn(self, table, geom_type, geom_column='the_geom', srid=-1, dim=2):
-		# use schema if explicitly specified
+	def addGeometryColumn(self, table, geom_column='geom', geom_type='POINT', srid=-1, dim=2):
 		schema, tablename = self.getSchemaTableName(table)
 		schema_part = u"%s, " % self.quoteString(schema) if schema else ""
 
 		sql = u"SELECT AddGeometryColumn(%s%s, %s, %d, %s, %d)" % (schema_part, self.quoteString(tablename), self.quoteString(geom_column), srid, self.quoteString(geom_type), dim)
 		self._execute_and_commit(sql)
+
+	def deleteGeometryColumn(self, table, geom_column):
+		return self.deleteTableColumn(table, geom_column)
 
 
 	def addTableUniqueConstraint(self, table, column):
@@ -786,7 +839,7 @@ class PostGisDBConnector(DBConnector):
 		self._execute_and_commit(sql)
 
 
-	def addTableIndex(self, table, name, column):
+	def createTableIndex(self, table, name, column):
 		""" create index on one column using default options """
 		sql = u"CREATE INDEX %s ON %s (%s)" % (self.quoteId(name), self.quoteId(table), self.quoteId(column))
 		self._execute_and_commit(sql)
@@ -796,11 +849,16 @@ class PostGisDBConnector(DBConnector):
 		sql = u"DROP INDEX %s" % self.quoteId( (schema, name) )
 		self._execute_and_commit(sql)
 
-	def createSpatialIndex(self, table, geom_column='the_geom'):
+	def createSpatialIndex(self, table, geom_column='geom'):
 		schema, tablename = self.getSchemaTableName(table)
 		idx_name = self.quoteId(u"sidx_%s_%s" % (tablename, geom_column))
 		sql = u"CREATE INDEX %s ON %s USING GIST(%s)" % (idx_name, self.quoteId(table), self.quoteId(geom_column))
 		self._execute_and_commit(sql)
+
+	def deleteSpatialIndex(self, table, geom_column='geom'):
+		schema, tablename = self.getSchemaTableName(table)
+		idx_name = self.quoteId(u"sidx_%s_%s" % (tablename, geom_column))
+		return self.dropTableIndex(table, idx_name)
 
 
 	def _error_types(self):

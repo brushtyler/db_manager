@@ -33,21 +33,20 @@ class DlgFieldProperties(QDialog, Ui_DlgFieldProperties):
 			self.editDefault.setText(fld.default)
 
 	def getField(self, newCopy=False):
-		if not self.fld or newCopy:
-			self.fld = TableField(self.table)
-		self.fld.name = self.editName.text()
-		self.fld.dataType = self.cboType.currentText()
-		self.fld.notNull = not self.chkNull.isChecked()
-		self.fld.default = self.editDefault.text()
-		self.fld.hasDefault = self.fld.default != ""
+		fld = TableField(self.table) if not self.fld or newCopy else self.fld
+		fld.name = self.editName.text()
+		fld.dataType = self.cboType.currentText()
+		fld.notNull = not self.chkNull.isChecked()
+		fld.default = self.editDefault.text()
+		fld.hasDefault = fld.default != ""
 		modifier, ok = self.editLength.text().toInt()
-		self.fld.modifier = modifier if ok else None
-		return self.fld
+		fld.modifier = modifier if ok else None
+		return fld
 
 
 	def onOK(self):
 		""" first check whether everything's fine """
-		fld = self.getField()
+		fld = self.getField(True)	# don't change the original copy
 		if fld.name == "":
 			QMessageBox.critical(self, "sorry", "field name must not be empty")
 			return
