@@ -29,6 +29,15 @@ from .dlg_db_error import DlgDbError
 class TableViewer(QTableView):
 	def __init__(self, parent=None):
 		QTableView.__init__(self, parent)
+		self.setSelectionBehavior( QAbstractItemView.SelectRows )
+		self.setSelectionMode( QAbstractItemView.ExtendedSelection )
+
+		# allow to copy results
+		copyAction = QAction("copy", self)
+		self.addAction( copyAction )
+		copyAction.setShortcuts(QKeySequence.Copy)
+		QObject.connect(copyAction, SIGNAL("triggered()"), self.copySelectedResults)
+
 		self._clear()
 
 	def refresh(self):
@@ -64,5 +73,19 @@ class TableViewer(QTableView):
 		else:
 			self.update()
 			QApplication.restoreOverrideCursor()
+
+
+	def copySelectedResults(self):
+		if len(self.selectedIndexes()) <= 0:
+			return
+		model = self.model()
+
+		# convert to string using tab as separator
+		text = model.headerToString( "\t" )
+		for idx in self.selectionModel().selectedRows():
+			text += "\n" + model.rowToString( idx.row(), "\t" )
+
+		QApplication.clipboard().setText( text, QClipboard.Selection )
+		QApplication.clipboard().setText( text, QClipboard.Clipboard )
 
 
