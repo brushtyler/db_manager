@@ -180,7 +180,7 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 
 		try:
 			connector._execute(c, sql)
-			cols = connector._get_columns(c)
+			cols = connector._get_cursor_columns(c)
 
 		except DbError, e:
 			QApplication.restoreOverrideCursor()
