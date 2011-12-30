@@ -2,7 +2,8 @@ DB Manager TODO and DONE list.
 
 
 DONE:
-* GUI to import data by drag'n'drop (v.0.1.8)
+* allow to copy contents from views (v0.1.9)
+* GUI to import data by drag'n'drop (v0.1.8)
 * edit table (v0.1.8)
 * create table (v0.1.7)
 * display schemas and tables comments (v0.1.6)
