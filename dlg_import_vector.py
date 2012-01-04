@@ -183,7 +183,7 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 			outCrs = qgis.core.QgsCoordinateReferenceSystem(targetSrid)
 
 		if self.chkEncoding.isChecked():
-			enc = self.editEncoding.currentText()
+			enc = self.cboEncoding.currentText()
 			self.inLayer.setProviderEncoding( enc )
 
 		ret, errMsg = qgis.core.QgsVectorLayerImport.importLayer( self.inLayer, uri, providerName, outCrs )
