@@ -29,6 +29,11 @@ from ..connector import DBConnector
 from ..plugin import ConnectionError, DbError, Table
 
 import psycopg2
+import psycopg2.extensions
+# use unicode!
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
+
 
 def classFactory():
 	return PostGisDBConnector
