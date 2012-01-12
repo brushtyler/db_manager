@@ -68,7 +68,7 @@ class BaseTableModel(QAbstractTableModel):
 		if val == None:
 			return QVariant("NULL")
 		else:
-			return QVariant(val)		
+			return QVariant( unicode(val) )	# convert to string
 	
 	def headerData(self, section, orientation, role):
 		if role != Qt.DisplayRole:
