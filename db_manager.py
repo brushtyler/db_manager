@@ -122,9 +122,11 @@ class DBManager(QMainWindow):
 
 		from dlg_sql_window import DlgSqlWindow
 		dlg = DlgSqlWindow(self.iface, db, self)
+		#refreshDb = lambda x: self.refreshItem( db.connection() ) # refresh the database tree 
+		#self.connect( dlg, SIGNAL( "queryExecuted(const QString &)" ), refreshDb )
+		dlg.show()
 		dlg.exec_()
-		# refresh the database tree 
-		self.refreshItem( db.connection() )
+		
 
 	def showSystemTables(self):
 		self.tree.showSystemTables( self.actionShowSystemTables.isChecked() )
