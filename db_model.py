@@ -498,10 +498,10 @@ class DBModel(QAbstractItemModel):
 		while not stream.atEnd():
 			mimeUri = stream.readQString()
 
-			parts = QStringList() << unicode(mimeUri).split(":", 4)
+			parts = QStringList() << unicode(mimeUri).split(":", 3)
 			if len(parts) != 4:
 				# invalid qgis mime uri
-				#print ">>>invalid mimeUri"
+				QMessageBox.warning(None, "Invalid MIME uri", "The dropped object is not a valid QGis layer")
 				continue
 
 			layerType, providerKey, layerName, uriString = parts
@@ -511,8 +511,8 @@ class DBModel(QAbstractItemModel):
 			else:
 				inLayer = qgis.core.QgsVectorLayer(uriString, layerName, providerKey)
 			if not inLayer.isValid():
-				#print ">>>invalid inLayer"
 				# invalid layer
+				QMessageBox.warning(None, "Invalid layer", u"QGis was unable to load the layer %s" % inLayer.name())
 				continue
 
 			# retrieve information about the new table's db and schema
