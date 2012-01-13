@@ -452,8 +452,7 @@ class Table(DbItemObject):
 		uri = self.database().uri()
 		schema = self.schemaName() if self.schemaName() else ''
 		geomCol = self.geomColumn if self.type in [Table.VectorType, Table.RasterType] else QString()
-		pk = self.getValidQGisUniqueFields(True)
-		uri.setDataSource(schema, self.name, geomCol if geomCol else QString(), QString(), pk.name if pk else QString())
+		uri.setDataSource(schema, self.name, geomCol if geomCol else QString())
 		return uri
 
 	def mimeUri(self):
@@ -469,7 +468,10 @@ class Table(DbItemObject):
 		return QgsVectorLayer(uri, self.name, provider)
 
 	def getValidQGisUniqueFields(self, onlyOne=False):
-		""" list of fields valid to load the table as layer in qgis canvas """
+		""" list of fields valid to load the table as layer in QGis canvas.
+			QGis automatically search for a valid unique field, so it's 
+			needed only for queries (e.g. SELECT * FROM table LIMIT 1)"""
+
 		ret = []
 
 		# add the pk

@@ -135,8 +135,7 @@ class SLVectorTable(SLTable, VectorTable):
 
 	def uri(self):
 		uri = self.database().uri()
-		pk = self.getValidQGisUniqueFields(True)
-		uri.setDataSource('', self.geomTableName, self.geomColumn, QString(), pk.name if pk else QString())
+		uri.setDataSource('', self.geomTableName, self.geomColumn)
 		return uri
 
 	def hasSpatialIndex(self, geom_column=None):		
