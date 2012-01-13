@@ -57,7 +57,7 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 
 		self.cboTable.setEditText(self.outUri.table())
 		pk = self.outUri.keyColumn()
-		self.editPrimaryKey.setText(pk if pk != "" else "pk")
+		self.editPrimaryKey.setText(pk if pk != "" else "id")
 		geom = self.outUri.geometryColumn()
 		self.editGeomColumn.setText(geom if geom != "" else "geom")
 		inCrs = self.inLayer.crs()

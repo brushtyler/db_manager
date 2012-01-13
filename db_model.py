@@ -534,20 +534,15 @@ class DBModel(QAbstractItemModel):
 				# create the output uri
 				schema = outSchema.name if outDb.schemas() != None and outSchema != None else QString()
 				pkCol = geomCol = QString()
-				sql = inLayer.subsetString()
 
-				if providerKey == 'ogr':
-					# default pk and geom field name value
-					pkCol = "gid" if inLayer.hasGeometryType() else "pk"
-					geomCol = "geom" if inLayer.hasGeometryType() else QString()
-
-				elif providerKey in ['postgres', 'spatialite']:
+				# default pk and geom field name value
+				if providerKey in ['postgres', 'spatialite']:
 					inUri = qgis.core.QgsDataSourceURI( inLayer.source() )
 					pkCol = inUri.keyColumn()
 					geomCol = inUri.geometryColumn()
 
 				outUri = outDb.uri()
-				outUri.setDataSource( schema, layerName, geomCol, sql, pkCol )
+				outUri.setDataSource( schema, layerName, geomCol, QString(), pkCol )
 
 				added = added + 1
 				self.emit( SIGNAL("importVector"), inLayer, outDb, outUri, toIndex )
@@ -567,3 +562,4 @@ class DBModel(QAbstractItemModel):
 				self._refreshIndex( parent )
 		finally:
 			inLayer.deleteLater()
+
