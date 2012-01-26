@@ -132,25 +132,53 @@ class DBManager(QMainWindow):
 		self.tree.showSystemTables( self.actionShowSystemTables.isChecked() )
 
 
-	def registerAction(self, action, menu, callback):
+	def registerAction(self, action, menuName, callback=None):
 		""" register an action to the manager's main menu """
 		if not hasattr(self, '_registeredDbActions'):
-			self._registeredDbActions = []
+			self._registeredDbActions = {}
 
-		invoke_callback = lambda x: self.__invokeCallback( callback )
-		if menu == None or menu == "":
+		if callback != None:
+			invoke_callback = lambda x: self.__invokeCallback( callback )
+
+		if menuName == None or menuName == "":
 			self.addAction( action )
-			self._registeredDbActions.append( (action, menu) )
-			QObject.connect( action, SIGNAL("triggered(bool)"), invoke_callback )
+
+			if not self._registeredDbActions.has_key(menuName):
+				self._registeredDbActions[menuName] = list()
+			self._registeredDbActions[menuName].append(action)
+
+			if callback != None:
+				QObject.connect( action, SIGNAL("triggered(bool)"), invoke_callback )
 			return True
 
 		for a in self.menuBar.actions():
-			if not a.menu() or a.menu().title() != menu:
+			if not a.menu() or a.menu().title() != menuName:
 				continue
-			a.menu().addAction( action )
+
+			menu = a.menu()
+			menuActions = menu.actions()
+
+			# get the placeholder's position to insert before it
+			for pos in range(len(menuActions)):
+				if menuActions[pos].isSeparator() and menuActions[pos].text() == "placeholder":
+					menuActions[pos].setVisible(True)
+					break
+
+			if pos < len(menuActions):
+				before = menuActions[pos]
+				menu.insertAction( before, action )
+			else:
+				menu.addAction( action )
+
 			a.setVisible(True)	# show the menu
-			self._registeredDbActions.append( (action, menu) )
-			QObject.connect( action, SIGNAL("triggered(bool)"), invoke_callback )
+
+			if not self._registeredDbActions.has_key(menuName):
+				self._registeredDbActions[menuName] = list()
+			self._registeredDbActions[menuName].append(action)
+
+			if callback != None:
+				QObject.connect( action, SIGNAL("triggered(bool)"), invoke_callback )
+
 			return True
 
 		return False
@@ -163,25 +191,43 @@ class DBManager(QMainWindow):
 		except DbError, e:
 			DlgDbError.showError(e, self)
 
-	def unregisterAction(self, action, menu):
+	def unregisterAction(self, action, menuName):
 		if not hasattr(self, '_registeredDbActions'):
 			return
 
-		if menu == None or menu == "":
+		if menuName == None or menuName == "":
 			self.removeAction( action )
-			if self._registeredDbActions.count( (action, menu) ) > 0:
-				self._registeredDbActions.remove( (action, menu) )
+
+			if self._registeredDbActions.has_key(menuName):
+				if self._registeredDbActions[menuName].count( action ) > 0:
+					self._registeredDbActions[menuName].remove( action )
+
 			action.deleteLater()
 			return True
 
 		for a in self.menuBar.actions():
-			if not a.menu() or a.menu().title() != menu:
+			if not a.menu() or a.menu().title() != menuName:
 				continue
-			a.menu().removeAction( action )
-			if a.menu().isEmpty():	# hide the menu
+
+			menu = a.menu()
+			menuActions = menu.actions()
+
+			menu.removeAction( action )
+			if menu.isEmpty():	# hide the menu
 				a.setVisible(False)
-			if self._registeredDbActions.count( (action, menu) ) > 0:
-				self._registeredDbActions.remove( (action, menu) )
+
+			if self._registeredDbActions.has_key(menuName):
+				if self._registeredDbActions[menuName].count( action ) > 0:
+					self._registeredDbActions[menuName].remove( action )
+
+				# hide the placeholder if there're no other registered actions
+				if len(self._registeredDbActions[menuName]) <= 0:
+					for i in range(len(menuActions)):
+						if menuActions[i].isSeparator() and menuActions[i].text() == "placeholder":
+							menuActions[i].setVisible(False)
+							break
+
+
 			action.deleteLater()
 			return True
 
@@ -191,9 +237,10 @@ class DBManager(QMainWindow):
 		if not hasattr(self, '_registeredDbActions'):
 			return
 
-		for action, menu in list(self._registeredDbActions):
-			self.unregisterAction( action, menu )
-		self._registeredDbActions = []
+		for menuName in self._registeredDbActions:
+			for action in list(self._registeredDbActions[menuName]):
+				self.unregisterAction( action, menuName )
+		del self._registeredDbActions
 
 
 	def setupUi(self):
@@ -243,15 +290,20 @@ class DBManager(QMainWindow):
 		self.addToolBar(self.toolBar)
 
 		# create menus' actions
+
 		# menu DATABASE
+		sep = self.menuDb.addAction("placeholder"); sep.setSeparator(True); sep.setVisible(False)
 		self.actionRefresh = self.menuDb.addAction( QIcon(":/db_manager/actions/refresh"), "&Refresh", self.refreshItem, QKeySequence("F5") )
 		self.actionSqlWindow = self.menuDb.addAction( QIcon(":/db_manager/actions/sql_window"), "&SQL window", self.runSqlWindow, QKeySequence("F2") )
+		self.menuDb.addSeparator()
 		self.actionClose = self.menuDb.addAction( QIcon(), "&Exit", self.close, QKeySequence("CTRL+Q") )
 
 		# menu SCHEMA
+		sep = self.menuSchema.addAction("placeholder"); sep.setSeparator(True); sep.setVisible(False)
 		actionMenuSchema.setVisible(False)
 
 		# menu TABLE
+		sep = self.menuTable.addAction("placeholder"); sep.setSeparator(True); sep.setVisible(False)
 		actionMenuTable.setVisible(False)
 		self.actionShowSystemTables = self.menuTable.addAction("Show system tables/views", self.showSystemTables)
 		self.actionShowSystemTables.setCheckable(True)
