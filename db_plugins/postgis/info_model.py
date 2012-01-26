@@ -36,7 +36,11 @@ class PGTableInfo(TableInfo):
 
 		# if the estimation is less than 100 rows, try to count them - it shouldn't take long time
 		if self.table.rowCount == None and self.table.estimatedRowCount < 100:
+			# row count information is not displayed yet, so just block 
+			# table signals to avoid double refreshing (infoViewer->refreshRowCount->tableChanged->infoViewer)
+			self.table.blockSignals(True)
 			self.table.refreshRowCount()
+			self.table.blockSignals(False)
 
 		tbl = [
 			("Relation type:", "View" if self.table.isView else "Table"), 

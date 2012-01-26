@@ -185,11 +185,15 @@ class TableInfo:
 
 	def generalInfo(self):
 		if self.table.rowCount == None:
+			# row count information is not displayed yet, so just block 
+			# table signals to avoid double refreshing (infoViewer->refreshRowCount->tableChanged->infoViewer)
+			self.table.blockSignals(True)
 			self.table.refreshRowCount()
+			self.table.blockSignals(False)
 
 		tbl = [
 			("Relation type:", "View" if self.table.isView else "Table"), 
-			("Rows:", self.table.rowCount if self.table.rowCount != None else "Unknown") 
+			("Rows:", self.table.rowCount if self.table.rowCount != None else 'Unknown (<a href="action:rows/count">find out</a>)') 
 		]
 		if self.table.comment:
 			tbl.append( ("Comment:", self.table.comment) )

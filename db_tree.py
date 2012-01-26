@@ -34,10 +34,10 @@ class DBTree(QTreeView):
 		self.setAcceptDrops(True)
 		self.setDropIndicatorShown(True)
 
-		self.connect(self.selectionModel(), SIGNAL("currentChanged(const QModelIndex&, const QModelIndex&)"), self.itemChanged)
+		self.connect(self.selectionModel(), SIGNAL("currentChanged(const QModelIndex&, const QModelIndex&)"), self.currentItemChanged)
 		self.connect(self, SIGNAL("expanded(const QModelIndex&)"), self.itemChanged)
 		self.connect(self, SIGNAL("collapsed(const QModelIndex&)"), self.itemChanged)
-		self.connect(self.model(), SIGNAL("dataChanged(const QModelIndex&, const QModelIndex&)"), self.itemChanged)
+		self.connect(self.model(), SIGNAL("dataChanged(const QModelIndex&, const QModelIndex&)"), self.modelDataChanged)
 		self.connect(self.model(), SIGNAL("notPopulated"), self.collapse)
 
 	def refreshItem(self, item=None):
@@ -80,7 +80,13 @@ class DBTree(QTreeView):
 		return None
 			
 
-	def itemChanged(self, indexFrom, indexTo=None):
-		self.setCurrentIndex(indexFrom)
-		self.emit( SIGNAL('currentChanged'), self.currentItem() )
+	def itemChanged(self, index):
+		self.setCurrentIndex(index)
+		self.emit( SIGNAL('selectedItemChanged'), self.currentItem() )
+
+	def modelDataChanged(self, indexFrom, indexTo):
+		self.itemChanged(indexTo)
+
+	def currentItemChanged(self, current, previous):
+		self.itemChanged(current)
 

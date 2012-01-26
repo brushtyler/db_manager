@@ -26,13 +26,14 @@ from PyQt4.QtGui import *
 from ..db_plugins import createDbPlugin
 from .html_elems import HtmlParagraph, HtmlTable
 
-class BaseException(Exception):
+class BaseError(Exception):
+	"""Base class for exceptions in the plugin."""
 	def __init__(self, msg):
 		try:
 			self.msg = unicode( msg )
 		except UnicodeDecodeError:
 			self.msg = unicode( msg, 'utf-8' )
-		Exception(self, self.msg)
+		Exception.__init__(self, self.msg)
 
 	def __unicode__(self):
 		return self.msg
@@ -40,15 +41,15 @@ class BaseException(Exception):
 	def __str__(self):
 		return unicode(self).encode('utf-8')
 
-class InvalidDataException(BaseException):
+class InvalidDataException(BaseError):
 	pass
 
-class ConnectionError(BaseException):
+class ConnectionError(BaseError):
 	pass
 
-class DbError(BaseException):
-	def __init__(self, ex, query=None):
-		BaseException.__init__(self, ex.args[0])
+class DbError(BaseError):
+	def __init__(self, msg, query=None):
+		BaseError.__init__(self, msg)
 		self.query = unicode( query ) if query else None
 
 	def __unicode__(self):
@@ -628,19 +629,23 @@ class Table(DbItemObject):
 
 
 	def refreshRowCount(self):
+		prevRowCount = self.rowCount
 		try:
 			self.rowCount = self.database().connector.getTableRowCount( (self.schemaName(), self.name) )
 			self.rowCount = int(self.rowCount) if self.rowCount != None else None
 		except DbError:
 			self.rowCount = None
-		self.refresh()
+		if self.rowCount != prevRowCount:
+			self.refresh()
 
 	def refreshTableExtent(self):
+		prevExtent = self.extent
 		try:
 			self.extent = self.database().connector.getTableExtent( (self.schemaName(), self.name), self.geomColumn )
 		except DbError:
 			self.extent = None
-		self.refresh()
+		if self.extent != prevExtent:
+			self.refresh()
 
 
 	def runAction(self, action):

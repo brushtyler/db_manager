@@ -71,7 +71,7 @@ class DBConnector:
 		except self._error_types(), e:
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self._rollback()
-			raise DbError(e, sql)
+			raise DbError(e.message, sql)
 		return cursor
 		
 	def _execute_and_commit(self, sql):

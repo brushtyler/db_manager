@@ -49,7 +49,7 @@ class DBManager(QMainWindow):
 		self.restoreState( settings.value("/DB_Manager/mainWindow/windowState").toByteArray() )
 
 		self.connect(self.tabs, SIGNAL("currentChanged(int)"), self.tabChanged)
-		self.connect(self.tree, SIGNAL("currentChanged"), self.itemChanged)
+		self.connect(self.tree, SIGNAL("selectedItemChanged"), self.itemChanged)
 		self.itemChanged(None)
 
 	def closeEvent(self, e):
