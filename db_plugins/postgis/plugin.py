@@ -152,6 +152,24 @@ class PGDatabase(Database):
 		return PGSqlResultModel(self, sql, parent)
 
 
+	def registerDatabaseActions(self, mainWindow):
+		Database.registerDatabaseActions(self, mainWindow)
+
+		# add a separator
+		separator = QAction(self); 
+		separator.setSeparator(True)
+		mainWindow.registerAction( separator, "&Table" )
+
+		action = QAction("Run &Vacuum Analyze", self)
+		mainWindow.registerAction( action, "&Table", self.runVacuumAnalyzeActionSlot )
+
+	def runVacuumAnalyzeActionSlot(self, item, action, parent):
+		if not isinstance(item, Table) or item.isView:
+			QMessageBox.information(parent, "Sorry", "Select a TABLE for vacuum analyze.")
+			return
+		item.runVacuumAnalyze()
+
+
 class PGSchema(Schema):
 	def __init__(self, row, db):
 		Schema.__init__(self, db)

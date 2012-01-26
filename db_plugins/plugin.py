@@ -225,6 +225,7 @@ class Database(DbItemObject):
 		action = QAction("&Empty table", self)
 		mainWindow.registerAction( action, "&Table", self.emptyTableActionSlot )
 
+
 	def deleteActionSlot(self, item, action, parent):
 		if isinstance(item, Schema):
 			self.deleteSchemaActionSlot(item, action, parent)
@@ -232,6 +233,7 @@ class Database(DbItemObject):
 			self.deleteTableActionSlot(item, action, parent)
 		else:
 			QMessageBox.information(parent, "Sorry", "Cannot delete the selected item.")
+
 
 	def createSchemaActionSlot(self, item, action, parent):
 		if not isinstance(item, (DBPlugin, Schema, Table)) or item.database() == None:
@@ -688,12 +690,6 @@ class Table(DbItemObject):
 				enable = trigger_action == "enable"
 				self.database().connector.enableTableTrigger(trigger_name, enable, (self.schemaName(), self.name) )
 				self.refreshTriggers()
-				return True
-
-		if action.startswith( "vacuum/" ):
-			if action == "vacuum/run":
-				self.database().connector.runVacuum()
-				self.database().refresh()
 				return True
 
 		if action.startswith( "extent/" ):

@@ -106,6 +106,34 @@ class SLDatabase(Database):
 		return SLSqlResultModel(self, sql, parent)
 
 
+	def registerDatabaseActions(self, mainWindow):
+		action = QAction("Run &Vacuum", self)
+		mainWindow.registerAction( action, "&Database", self.runVacuumActionSlot )
+
+		Database.registerDatabaseActions(self, mainWindow)
+
+	def runVacuumActionSlot(self, item, action, parent):
+		if not isinstance(item, (DBPlugin, Table)) or item.database() == None:
+			QMessageBox.information(parent, "Sorry", "No database selected or you are not connected to it.")
+			return
+		self.runVacuum()
+
+	def runVacuum(self):
+		self.database().connector.runVacuum()
+		self.database().refresh()
+
+
+	def runAction(self, action):
+		action = unicode(action)
+
+		if action.startswith( "vacuum/" ):
+			if action == "vacuum/run":
+				self.runVacuum()
+				return True
+
+		return Database.runAction(self, action)
+
+
 class SLTable(Table):
 	def __init__(self, row, db, schema=None):
 		Table.__init__(self, db, None)
