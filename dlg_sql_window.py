@@ -159,6 +159,9 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 		if query.isEmpty():
 			return
 
+		# try to sanitize query
+		query = query.replace( QRegExp( ";\\s*$" ), "" )
+
 		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
 		self.uniqueCombo.clear()
 		self.geomCombo.clear()
