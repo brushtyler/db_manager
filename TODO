@@ -2,7 +2,7 @@ DB Manager TODO and DONE list.
 
 
 DONE:
-* fix errors handling, add Run Vacuum to menu (v0.1.11)
+* fix errors handling, add "Run Vacuum" and "Move to schema" to menu (v0.1.11)
 * fix encoding support and import layer on Win (v0.1.10)
 * allow to copy contents from views (v0.1.9)
 * GUI to import data by drag'n'drop (v0.1.8)

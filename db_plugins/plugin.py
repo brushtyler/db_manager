@@ -225,6 +225,13 @@ class Database(DbItemObject):
 		action = QAction("&Empty table", self)
 		mainWindow.registerAction( action, "&Table", self.emptyTableActionSlot )
 
+		if self.schemas() != None:
+			action = QAction("&Move to schema", self)
+			action.setMenu( QMenu(mainWindow) )
+			invoke_callback = lambda: mainWindow.invokeCallback(self.prepareMenuMoveTableToSchemaActionSlot)
+			QObject.connect( action.menu(), SIGNAL("aboutToShow()"), invoke_callback )
+			mainWindow.registerAction( action, "&Table" )
+
 
 	def deleteActionSlot(self, item, action, parent):
 		if isinstance(item, Schema):
@@ -252,7 +259,6 @@ class Database(DbItemObject):
 		if res != QMessageBox.Yes:
 			return
 		item.delete()
-
 
 	def schemasFactory(self, row, db):
 		return None
@@ -299,6 +305,20 @@ class Database(DbItemObject):
 		if res != QMessageBox.Yes:
 			return
 		item.empty()
+
+	def prepareMenuMoveTableToSchemaActionSlot(self, item, menu, mainWindow):
+		""" populate menu with schemas """
+		slot = lambda x: lambda: self.moveTableToSchemaActionSlot(item, x, mainWindow)
+
+		menu.clear()
+		for schema in self.schemas():
+			action = menu.addAction(schema.name, slot(schema))
+		
+	def moveTableToSchemaActionSlot(self, item, schema, parent):
+		if not isinstance(item, Table):
+			QMessageBox.information(parent, "Sorry", "Select a TABLE/VIEW.")
+			return
+		item.moveToSchema(schema)
 
 
 	def tablesFactory(self, row, db, schema=None):
@@ -445,6 +465,15 @@ class Table(DbItemObject):
 		ret = self.database().connector.emptyTable( (self.schemaName(), self.name) )
 		if ret != False:
 			self.refreshRowCount()
+		return ret
+
+	def moveToSchema(self, schema):
+		if self.schema() == schema:
+			return True
+		ret = self.database().connector.moveTableToSchema( (self.schemaName(), self.name), schema.name )
+		if ret != False:
+			self.schema().refresh()
+			schema.refresh()
 		return ret
 
 	def info(self):
