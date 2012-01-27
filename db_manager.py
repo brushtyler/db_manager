@@ -138,7 +138,7 @@ class DBManager(QMainWindow):
 			self._registeredDbActions = {}
 
 		if callback != None:
-			invoke_callback = lambda x: self.__invokeCallback( callback )
+			invoke_callback = lambda x: self.invokeCallback( callback )
 
 		if menuName == None or menuName == "":
 			self.addAction( action )
@@ -183,8 +183,8 @@ class DBManager(QMainWindow):
 
 		return False
 
-	def __invokeCallback(self, callback):
-		action = self.sender
+	def invokeCallback(self, callback):
+		action = self.sender()
 		selected_item = self.tree.currentItem()
 		try:
 			callback( selected_item, action, self ) 
