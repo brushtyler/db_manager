@@ -334,7 +334,7 @@ class PostGisDBConnector(DBConnector):
 				tuples
 				pages
 				raster_column:
-					r_column (or pg_attribute.attname, the raster column name)
+					r_raster_column (or pg_attribute.attname, the raster column name)
 					pixel type
 					block size
 					internal or external
@@ -358,8 +358,8 @@ class PostGisDBConnector(DBConnector):
 		if self.has_raster_columns and self.has_raster_columns_access:
 			raster_column_from = u"""LEFT OUTER JOIN raster_columns AS rast ON 
 						cla.relname = rast.r_table_name AND nsp.nspname = r_table_schema AND 
-						lower(att.attname) = lower(r_column)"""
-			raster_fields_select = u"""CASE WHEN rast.r_column IS NOT NULL THEN rast.r_column ELSE att.attname END, 
+						lower(att.attname) = lower(r_raster_column)"""
+			raster_fields_select = u"""CASE WHEN rast.r_raster_column IS NOT NULL THEN rast.r_raster_column ELSE att.attname END, 
 						rast.pixel_types,
 						rast.scale_x,
 						rast.scale_y,
