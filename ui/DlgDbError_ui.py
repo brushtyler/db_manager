@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'ui/DlgDbError.ui'
 #
-# Created: Sat Jan 28 01:55:09 2012
+# Created: Sat Jan 28 17:25:02 2012
 #      by: PyQt4 UI code generator 4.8.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -47,14 +47,14 @@ class Ui_DlgDbError(object):
         self.label = QtGui.QLabel(self.page)
         self.label.setObjectName(_fromUtf8("label"))
         self.verticalLayout.addWidget(self.label)
-        self.txtQueryErrorMgs = QtGui.QTextBrowser(self.page)
+        self.txtQueryErrorMsg = QtGui.QTextBrowser(self.page)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(1)
-        sizePolicy.setHeightForWidth(self.txtQueryErrorMgs.sizePolicy().hasHeightForWidth())
-        self.txtQueryErrorMgs.setSizePolicy(sizePolicy)
-        self.txtQueryErrorMgs.setObjectName(_fromUtf8("txtQueryErrorMgs"))
-        self.verticalLayout.addWidget(self.txtQueryErrorMgs)
+        sizePolicy.setHeightForWidth(self.txtQueryErrorMsg.sizePolicy().hasHeightForWidth())
+        self.txtQueryErrorMsg.setSizePolicy(sizePolicy)
+        self.txtQueryErrorMsg.setObjectName(_fromUtf8("txtQueryErrorMsg"))
+        self.verticalLayout.addWidget(self.txtQueryErrorMsg)
         self.label_2 = QtGui.QLabel(self.page)
         self.label_2.setObjectName(_fromUtf8("label_2"))
         self.verticalLayout.addWidget(self.label_2)
@@ -75,7 +75,7 @@ class Ui_DlgDbError(object):
         self.verticalLayout_2.addWidget(self.buttonBox)
 
         self.retranslateUi(DlgDbError)
-        self.stackedWidget.setCurrentIndex(0)
+        self.stackedWidget.setCurrentIndex(1)
         QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL(_fromUtf8("accepted()")), DlgDbError.accept)
         QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL(_fromUtf8("rejected()")), DlgDbError.reject)
         QtCore.QMetaObject.connectSlotsByName(DlgDbError)
