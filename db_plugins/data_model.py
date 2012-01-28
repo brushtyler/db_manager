@@ -23,6 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
+from .plugin import DbError
 
 class BaseTableModel(QAbstractTableModel):
 	def __init__(self, header=None, data=None, parent=None):
@@ -121,18 +122,20 @@ class TableDataModel(BaseTableModel):
 class SqlResultModel(BaseTableModel):
 	def __init__(self, db, sql, parent=None):
 		self.db = db.connector
-		c = self.db._get_cursor()
 
 		t = QTime()
 		t.start()
-		self.db._execute(c, unicode(sql))
+		c = self.db._execute(None, unicode(sql))
 		self._secs = t.elapsed() / 1000.0
 		del t
 
 		self._affectedRows = 0
 		data = []
+		header = self.db._get_cursor_columns(c)
+		if header == None:
+			header = []
+
 		try:
-			header = self.db._get_cursor_columns(c)
 			if len(header) > 0:
 				data = self.db._fetchall(c)
 			self._affectedRows = c.rowcount

@@ -27,7 +27,7 @@ from PyQt4.QtGui import *
 
 from .ui.DlgSqlWindow_ui import Ui_DlgSqlWindow
 
-from .db_plugins.plugin import DbError
+from .db_plugins.plugin import BaseError
 from .dlg_db_error import DlgDbError
 
 from highlighter import SqlHighlighter
@@ -105,7 +105,7 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 			self.viewResult.setModel( model )
 			self.lblResult.setText("%d rows, %.1f seconds" % (model.affectedRows(), model.secs()))
 
-		except DbError, e:
+		except BaseError, e:
 			QApplication.restoreOverrideCursor()
 			DlgDbError.showError(e, self)
 			return
@@ -179,13 +179,12 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 		cols = []
 		connector = self.db.connector
 		sql = u"SELECT * FROM (%s\n) AS %s LIMIT 0" % ( unicode(query), connector.quoteId(alias) )
-		c = connector._get_cursor()
 
 		try:
-			connector._execute(c, sql)
+			c = connector._execute(None, sql)
 			cols = connector._get_cursor_columns(c)
 
-		except DbError, e:
+		except BaseError, e:
 			QApplication.restoreOverrideCursor()
 			DlgDbError.showError(e, self)
 			return

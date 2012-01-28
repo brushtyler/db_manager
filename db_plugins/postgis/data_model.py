@@ -26,7 +26,6 @@ from PyQt4.QtGui import *
 from ..data_model import TableDataModel, SqlResultModel
 from ..plugin import DbError
 
-
 class PGTableDataModel(TableDataModel):
 	def __init__(self, table, parent=None):
 		self.cursor = None
