@@ -23,7 +23,7 @@ email                : brush.tyler@gmail.com
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from .db_plugins.plugin import DbError, DBPlugin, Schema, Table
+from .db_plugins.plugin import BaseError, DbError, DBPlugin, Schema, Table
 from .dlg_db_error import DlgDbError
 
 class InfoViewer(QTextBrowser):
@@ -39,11 +39,16 @@ class InfoViewer(QTextBrowser):
 			return
 
 		if url.scheme() == "action":
+			QApplication.setOverrideCursor(Qt.WaitCursor)
 			try:
 				if self.item.runAction( url.path() ):
 					self.refresh()
-			except DbError, e:
+			except BaseError, e:
 				DlgDbError.showError(e, self)
+				return
+			finally:
+				QApplication.restoreOverrideCursor()
+
 
 	def refresh(self):
 		self.showInfo( self.item, True )		

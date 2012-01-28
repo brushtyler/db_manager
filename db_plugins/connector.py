@@ -25,7 +25,7 @@ from PyQt4.QtGui import *
 
 from qgis.core import QgsDataSourceURI
 
-from .plugin import DbError
+from .plugin import DbError, ConnectionError
 
 class DBConnector:
 	def __init__(self, uri):
@@ -60,37 +60,59 @@ class DBConnector:
 		return False
 
 
-	def _error_types():
-		raise Exception("DBConnector._error_types() is an abstract method")
+	def execution_error_types():
+		raise Exception("DBConnector.execution_error_types() is an abstract method")
+
+	def connection_error_types():
+		raise Exception("DBConnector.connection_error_types() is an abstract method")
 
 	def _execute(self, cursor, sql):
 		if cursor == None:
 			cursor = self._get_cursor()
 		try:
 			cursor.execute(unicode(sql))
-		except self._error_types(), e:
+
+		except self.connection_error_types(), e:
+			raise ConnectionError(e)
+
+		except self.execution_error_types(), e:
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self._rollback()
-			raise DbError(e.message, sql)
+			raise DbError(e, sql)
+
 		return cursor
 		
 	def _execute_and_commit(self, sql):
 		""" tries to execute and commit some action, on error it rolls back the change """
-		c = self.connection.cursor()
-		self._execute(c, sql)
+		self._execute(None, sql)
 		self._commit()
 
 	def _get_cursor(self, name=None):
-		if name:
-			name = QString( unicode(name).encode('ascii', 'replace') ).replace( QRegExp("\W"), "_" ).toAscii()
-			self._last_cursor_named_id = 0 if not hasattr(self, '_last_cursor_named_id') else self._last_cursor_named_id + 1
-			return self.connection.cursor( "%s_%d" % (name, self._last_cursor_named_id) )
-		return self.connection.cursor()
+		try:
+			if name != None:
+				name = QString( unicode(name).encode('ascii', 'replace') ).replace( QRegExp("\W"), "_" ).toAscii()
+				self._last_cursor_named_id = 0 if not hasattr(self, '_last_cursor_named_id') else self._last_cursor_named_id + 1
+				return self.connection.cursor( "%s_%d" % (name, self._last_cursor_named_id) )
+
+			return self.connection.cursor()
+
+		except self.connection_error_types(), e:
+			raise ConnectionError(e)
+
+		except self.execution_error_types(), e:
+			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
+			self._rollback()
+			raise DbError(e)
+
 
 	def _fetchall(self, c):
 		try:
 			return c.fetchall()
-		except self._error_types(), e:
+
+		except self.connection_error_types(), e:
+			raise ConnectionError(e)
+
+		except self.execution_error_types(), e:
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self._rollback()
 			raise DbError(e)
@@ -98,21 +120,49 @@ class DBConnector:
 	def _fetchone(self, c):
 		try:
 			return c.fetchone()
-		except self._error_types(), e:
+
+		except self.connection_error_types(), e:
+			raise ConnectionError(e)
+
+		except self.execution_error_types(), e:
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self._rollback()
 			raise DbError(e)
 
+
 	def _commit(self):
-		self.connection.commit()
+		try:
+			self.connection.commit()
+
+		except self.connection_error_types(), e:
+			raise ConnectionError(e)
+
+		except self.execution_error_types(), e:
+			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
+			self._rollback()
+			raise DbError(e)
+
 
 	def _rollback(self):
-		self.connection.rollback()
+		try:
+			self.connection.rollback()
+
+		except self.connection_error_types(), e:
+			raise ConnectionError(e)
+
+		except self.execution_error_types(), e:
+			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
+			self._rollback()
+			raise DbError(e)
+
 
 	def _get_cursor_columns(self, c):
-		if c.description:
-			return map(lambda x: x[0], c.description)
-		return []
+		try:
+			if c.description:
+				return map(lambda x: x[0], c.description)
+
+		except self.connection_error_types() + self.execution_error_types(), e:
+			return []
 
 
 	@classmethod

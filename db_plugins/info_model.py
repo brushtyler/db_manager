@@ -387,6 +387,13 @@ class VectorTableInfo(TableInfo):
 
 		# estimated extent
 		if not self.table.isView:
+			if self.table.estimatedExtent == None:
+				# estimated extent information is not displayed yet, so just block 
+				# table signals to avoid double refreshing (infoViewer->refreshEstimatedExtent->tableChanged->infoViewer)
+				self.table.blockSignals(True)
+				self.table.refreshTableEstimatedExtent()
+				self.table.blockSignals(False)
+
 			if self.table.estimatedExtent != None and self.table.estimatedExtent[0] != None:
 				estimated_extent_str = '%.5f, %.5f - %.5f, %.5f' % self.table.estimatedExtent
 				tbl.append( ("Estimated extent:", estimated_extent_str) )

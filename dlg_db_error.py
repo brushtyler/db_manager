@@ -26,19 +26,29 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from ui.DlgDbError_ui import Ui_DlgDbError
+from .db_plugins.plugin import DbError
 
 class DlgDbError(QDialog, Ui_DlgDbError):
-	
 	def __init__(self, e, parent=None):
 		QDialog.__init__(self, parent)
-		
 		self.setupUi(self)
-		
-		msg = "<pre>" + e.msg.replace('<','&lt;') + "</pre>"
-		self.txtMessage.setHtml(msg)
-		if e.query != None:
-			query = "<pre>" + e.query.replace('<','&lt;') + "</pre>"
-			self.txtQuery.setHtml(query)
+
+		def sanitize(txt):
+			return "" if txt == None else "<pre>" + txt.replace('<','&lt;') + "</pre>"
+
+		if isinstance(e, DbError) and hasattr(e.query):
+			self.setQueryMessage( sanitize(e.message), sanitize(e.query) )
+		else:
+			self.setMessage( sanitize(e.message) )
+
+	def setMessage(self, msg):
+		self.txtErrorMsg.setHtml(msg)
+		self.stackedWidget.setCurrentIndex(0)
+
+	def setQueryMessage(self, msg, query):
+		self.txtQueryErrorMsg.setHtml(msg)
+		self.txtQuery.setHtml(query)
+		self.stackedWidget.setCurrentIndex(1)
 
 
 	@staticmethod

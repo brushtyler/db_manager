@@ -242,7 +242,6 @@ class PGVectorTable(PGTable, VectorTable):
 		PGTable.__init__(self, row[:-4], db, schema)
 		VectorTable.__init__(self, db, schema)
 		self.geomColumn, self.geomType, self.geomDim, self.srid = row[-4:]
-		self.estimatedExtent = self.database().connector.getTableEstimatedExtent( (self.schemaName(), self.name), self.geomColumn )
 
 	def info(self):
 		from .info_model import PGVectorTableInfo

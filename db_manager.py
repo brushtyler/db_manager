@@ -31,7 +31,8 @@ from .layer_preview import LayerPreview
 
 from .db_tree import DBTree
 
-from .db_plugins.plugin import DbError, Table
+from .db_plugins import getDbPluginErrors
+from .db_plugins.plugin import BaseError, Table
 from .dlg_db_error import DlgDbError
 
 
@@ -52,6 +53,22 @@ class DBManager(QMainWindow):
 		self.connect(self.tree, SIGNAL("selectedItemChanged"), self.itemChanged)
 		self.itemChanged(None)
 
+		self.displayDbPluginErrors()
+
+	def displayDbPluginErrors(self):
+		if len(getDbPluginErrors()) <= 0:
+			return
+
+		if not hasattr(self, '_dbPluginErrorIndex') or self._dbPluginErrorIndex >= len(getDbPluginErrors()):
+			self._dbPluginErrorIndex = 0
+
+		msg = getDbPluginErrors()[self._dbPluginErrorIndex]
+		self._dbPluginErrorIndex += 1
+
+		self.statusBar.showMessage( msg, 5000 )
+		QTimer.singleShot( 6000, self.displayDbPluginErrors)
+
+
 	def closeEvent(self, e):
 		self.unregisterAllActions()
 
@@ -64,14 +81,28 @@ class DBManager(QMainWindow):
 
 
 	def refreshItem(self, item=None):
-		if item == None:
-			item = self.tree.currentItem()
-		self.tree.refreshItem(item)	# refresh item children in the db tree
-
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+		try:
+			if item == None:
+				item = self.tree.currentItem()
+			self.tree.refreshItem(item)	# refresh item children in the db tree
+		except BaseError, e:
+			DlgDbError.showError(e, self)
+			return
+		finally:
+			QApplication.restoreOverrideCursor()
 
 	def itemChanged(self, item):
-		self.reloadButtons()
-		self.refreshTabs()
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+		try:
+			self.reloadButtons()
+			self.refreshTabs()
+		except BaseError, e:
+			DlgDbError.showError(e, self)
+			return
+		finally:
+			QApplication.restoreOverrideCursor()
+
 
 	def reloadButtons(self):
 		db = self.tree.currentDatabase()
@@ -92,7 +123,15 @@ class DBManager(QMainWindow):
 
 
 	def tabChanged(self, index):
-		self.refreshTabs()
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+		try:
+			self.refreshTabs()
+		except BaseError, e:
+			DlgDbError.showError(e, self)
+			return
+		finally:
+			QApplication.restoreOverrideCursor()
+
 
 	def refreshTabs(self):
 		index = self.tabs.currentIndex()
@@ -113,6 +152,7 @@ class DBManager(QMainWindow):
 			self.table.loadData( item )
 		elif current_tab == self.preview:
 			self.preview.loadPreview( item )
+
 
 	def runSqlWindow(self):
 		db = self.tree.currentDatabase()
@@ -184,12 +224,15 @@ class DBManager(QMainWindow):
 		return False
 
 	def invokeCallback(self, callback):
-		action = self.sender()
-		selected_item = self.tree.currentItem()
+		QApplication.setOverrideCursor(Qt.WaitCursor)
 		try:
-			callback( selected_item, action, self ) 
-		except DbError, e:
+			callback( self.tree.currentItem(), self.sender(), self ) 
+		except BaseError, e:
 			DlgDbError.showError(e, self)
+			return
+		finally:
+			QApplication.restoreOverrideCursor()
+
 
 	def unregisterAction(self, action, menuName):
 		if not hasattr(self, '_registeredDbActions'):

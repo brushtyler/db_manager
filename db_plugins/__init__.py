@@ -38,16 +38,23 @@ def initDbPluginList():
 	for name in os.listdir(current_dir):
 		if not os.path.isdir( os.path.join( current_dir, name ) ):
 			continue
+
 		try:
-			exec( u"from .%s import plugin as mod" % name  )
+			exec( u"from .%s import plugin as mod" % name )
 		except ImportError, e:
+			DBPLUGIN_ERRORS.append( u"%s: %s" % (name, e.message) )
 			continue
+
 		pluginclass = mod.classFactory()
 		SUPPORTED_DBTYPES[ pluginclass.typeName() ] = pluginclass
+
 	return len(SUPPORTED_DBTYPES) > 0
 
 def supportedDbTypes():
 	return sorted(SUPPORTED_DBTYPES.keys())
+
+def getDbPluginErrors():
+	return DBPLUGIN_ERRORS
 
 def createDbPlugin(dbtype, conn_name=None):
 	if not SUPPORTED_DBTYPES.has_key( dbtype ):
@@ -58,5 +65,6 @@ def createDbPlugin(dbtype, conn_name=None):
 
 # initialize the plugin list
 SUPPORTED_DBTYPES = {}
+DBPLUGIN_ERRORS = []
 initDbPluginList()
 

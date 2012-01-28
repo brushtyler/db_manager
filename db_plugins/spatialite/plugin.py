@@ -182,6 +182,10 @@ class SLVectorTable(SLTable, VectorTable):
 			self.database().refresh()
 		return ret
 
+	def refreshTableEstimatedExtent(self):
+		return
+
+
 	def runAction(self, action):
 		if SLTable.runAction(self, action):
 			return True

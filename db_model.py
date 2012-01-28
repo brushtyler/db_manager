@@ -24,7 +24,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from .db_plugins import supportedDbTypes, createDbPlugin
-from .db_plugins.plugin import InvalidDataException, ConnectionError, DbError, Table
+from .db_plugins.plugin import BaseError, DbError, Table
 from dlg_db_error import DlgDbError
 
 import qgis.core
@@ -110,7 +110,6 @@ class PluginItem(TreeItem):
 			ConnectionItem(c, self)
 
 		self.populated = True
-		QApplication.restoreOverrideCursor()
 		return True
 
 
@@ -150,7 +149,7 @@ class ConnectionItem(TreeItem):
 				if not connection.connect():
 					return False
 
-			except (InvalidDataException, ConnectionError), e:
+			except BaseError, e:
 				QMessageBox.warning( None, u"Unable to connect", unicode(e) )
 				return False
 
@@ -158,7 +157,6 @@ class ConnectionItem(TreeItem):
 		self.connect(database, SIGNAL("changed"), self.itemChanged)
 		self.connect(database, SIGNAL("deleted"), self.itemRemoved)
 
-		QApplication.setOverrideCursor(Qt.WaitCursor)
 		schemas = database.schemas()
 		if schemas != None:
 			for s in schemas:
@@ -168,7 +166,6 @@ class ConnectionItem(TreeItem):
 			for t in tables:
 				TableItem(t, self)
 
-		QApplication.restoreOverrideCursor()
 		self.populated = True
 		return True
 
@@ -200,12 +197,10 @@ class SchemaItem(TreeItem):
 		if self.populated:
 			return True
 
-		QApplication.setOverrideCursor(Qt.WaitCursor)
 		for t in self.getItemData().tables():
 			TableItem(t, self)
 
 		self.populated = True
-		QApplication.restoreOverrideCursor()
 		return True
 
 
@@ -268,6 +263,7 @@ class TableItem(TreeItem):
 class DBModel(QAbstractItemModel):
 	def __init__(self, parent=None):
 		QAbstractItemModel.__init__(self, parent)
+		self.treeView = parent
 		self.header = ['Databases']
 
 		self.isImportVectorAvail = hasattr(qgis.core, 'QgsVectorLayerImport')
@@ -422,12 +418,16 @@ class DBModel(QAbstractItemModel):
 			if new_value == obj.name:
 				return False
 
+			QApplication.setOverrideCursor(Qt.WaitCursor)
 			try:
 				obj.rename(new_value)
 				self._onDataChanged(index)
-			except DbError, e:
-				DlgDbError.showError(e, None)
+			except BaseError, e:
+				DlgDbError.showError(e, self.treeView)
 				return False
+			finally:
+				QApplication.restoreOverrideCursor()
+
 			return True
 
 		return False
@@ -440,18 +440,27 @@ class DBModel(QAbstractItemModel):
 		self.endRemoveRows()
 
 	def _refreshIndex(self, index, force=False):
-		item = index.internalPointer() if index.isValid() else self.rootItem
-		prevPopulated = item.populated
-		if prevPopulated:
-			self.removeRows(0, self.rowCount(index), index)
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+		try:
+			item = index.internalPointer() if index.isValid() else self.rootItem
+			prevPopulated = item.populated
+			if prevPopulated:
+				self.removeRows(0, self.rowCount(index), index)
+				item.populated = False
+			if prevPopulated or force:
+				if item.populate():
+					for child in item.childItems:
+						self.connect(child, SIGNAL("itemChanged"), self.refreshItem)
+					self._onDataChanged( index )
+				else:
+					self.emit( SIGNAL("notPopulated"), index )
+
+		except BaseError, e:
 			item.populated = False
-		if prevPopulated or force:
-			if item.populate():
-				for child in item.childItems:
-					self.connect(child, SIGNAL("itemChanged"), self.refreshItem)
-				self._onDataChanged( index )
-			else:
-				self.emit( SIGNAL("notPopulated"), index )
+			return
+
+		finally:
+			QApplication.restoreOverrideCursor()
 
 	def _onDataChanged(self, indexFrom, indexTo=None):
 		if indexTo == None: indexTo = indexFrom

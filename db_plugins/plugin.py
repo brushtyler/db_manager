@@ -28,15 +28,17 @@ from .html_elems import HtmlParagraph, HtmlTable
 
 class BaseError(Exception):
 	"""Base class for exceptions in the plugin."""
-	def __init__(self, msg):
+	def __init__(self, e):
+		msg = e if isinstance(e, (str,unicode,QString)) else e.message
+
 		try:
-			self.msg = unicode( msg )
+			msg = unicode( msg )
 		except UnicodeDecodeError:
-			self.msg = unicode( msg, 'utf-8' )
-		Exception.__init__(self, self.msg)
+			msg = unicode( msg, 'utf-8' )
+		Exception.__init__(self, msg)
 
 	def __unicode__(self):
-		return self.msg
+		return self.message
 
 	def __str__(self):
 		return unicode(self).encode('utf-8')
@@ -48,11 +50,14 @@ class ConnectionError(BaseError):
 	pass
 
 class DbError(BaseError):
-	def __init__(self, msg, query=None):
-		BaseError.__init__(self, msg)
-		self.query = unicode( query ) if query else None
+	def __init__(self, e, query=None):
+		BaseError.__init__(self, e)
+		self.query = unicode( query ) if query != None else None
 
 	def __unicode__(self):
+		if self.query == None:
+			return BaseError.__unicode__(self)
+
 		msg = u"Error:\n%s" % self.msg
 		if self.query:
 			msg += u"\n\nQuery:\n%s" % self.query
@@ -84,6 +89,11 @@ class DBPlugin(QObject):
 		if self.db: 
 			return True
 		return False
+
+	def reconnect(self):
+		if self.db:
+			return self.connect( self.db.uri() )
+		return self.connect( self.parent() )
 
 	@classmethod
 	def icon(self):
@@ -206,6 +216,9 @@ class Database(DbItemObject):
 			load(self, mainWindow)
 
 	def registerDatabaseActions(self, mainWindow):
+		action = QAction("&Re-connect", self)
+		mainWindow.registerAction( action, "&Database", self.reconnectActionSlot )
+		
 		if self.schemas() != None:
 			action = QAction("&Create schema", self)
 			mainWindow.registerAction( action, "&Schema", self.createSchemaActionSlot )
@@ -231,6 +244,11 @@ class Database(DbItemObject):
 			invoke_callback = lambda: mainWindow.invokeCallback(self.prepareMenuMoveTableToSchemaActionSlot)
 			QObject.connect( action.menu(), SIGNAL("aboutToShow()"), invoke_callback )
 			mainWindow.registerAction( action, "&Table" )
+
+
+	def reconnectActionSlot(self, item, action, parent):
+		item.database().connection().reconnect()
+		item.database().refresh()
 
 
 	def deleteActionSlot(self, item, action, parent):
@@ -669,15 +687,6 @@ class Table(DbItemObject):
 		if self.rowCount != prevRowCount:
 			self.refresh()
 
-	def refreshTableExtent(self):
-		prevExtent = self.extent
-		try:
-			self.extent = self.database().connector.getTableExtent( (self.schemaName(), self.name), self.geomColumn )
-		except DbError:
-			self.extent = None
-		if self.extent != prevExtent:
-			self.refresh()
-
 
 	def runAction(self, action):
 		action = unicode(action)
@@ -719,11 +728,6 @@ class Table(DbItemObject):
 				enable = trigger_action == "enable"
 				self.database().connector.enableTableTrigger(trigger_name, enable, (self.schemaName(), self.name) )
 				self.refreshTriggers()
-				return True
-
-		if action.startswith( "extent/" ):
-			if action == "extent/get":
-				self.refreshTableExtent()
 				return True
 
 		return False
@@ -768,6 +772,26 @@ class VectorTable(Table):
 			self.refreshIndexes()
 		return ret
 
+
+	def refreshTableExtent(self):
+		prevExtent = self.extent
+		try:
+			self.extent = self.database().connector.getTableExtent( (self.schemaName(), self.name), self.geomColumn )
+		except DbError:
+			self.extent = None
+		if self.extent != prevExtent:
+			self.refresh()
+
+	def refreshTableEstimatedExtent(self):
+		prevEstimatedExtent = self.estimatedExtent
+		try:
+			self.estimatedExtent = self.database().connector.getTableEstimatedExtent( (self.schemaName(), self.name), self.geomColumn )
+		except DbError:
+			self.estimatedExtent = None
+		if self.estimatedExtent != prevEstimatedExtent:
+			self.refresh()
+
+
 	def runAction(self, action):
 		action = unicode(action)
 
@@ -786,7 +810,18 @@ class VectorTable(Table):
 				self.deleteSpatialIndex()
 				return True
 
+		if action.startswith( "extent/" ):
+			if action == "extent/get":
+				self.refreshTableExtent()
+				return True
+
+			if action == "extent/estimated/get":
+				self.refreshTableEstimatedExtent()
+				return True
+
+
 		return Table.runAction(self, action)
+
 
 class RasterTable(Table):
 	def __init__(self, db, schema=None, parent=None):
