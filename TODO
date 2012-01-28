@@ -2,6 +2,7 @@ DB Manager TODO and DONE list.
 
 
 DONE:
+* fix error dialog (v0.1.13)
 * improve error handling, add Re-connect button (v0.1.12)
 * add "Run Vacuum" and "Move to schema" to menu (v0.1.11)
 * fix encoding support and import layer on Win (v0.1.10)
