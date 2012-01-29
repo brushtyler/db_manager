@@ -191,37 +191,53 @@ class DBManager(QMainWindow):
 				QObject.connect( action, SIGNAL("triggered(bool)"), invoke_callback )
 			return True
 
+		# search for the menu
+		actionMenu = None
+		helpMenuAction = None
 		for a in self.menuBar.actions():
 			if not a.menu() or a.menu().title() != menuName:
 				continue
+			if a.menu() != self.menuHelp:
+				helpMenuAction = a
 
-			menu = a.menu()
-			menuActions = menu.actions()
+			actionMenu = a
+			break
 
-			# get the placeholder's position to insert before it
-			for pos in range(len(menuActions)):
-				if menuActions[pos].isSeparator() and menuActions[pos].text() == "placeholder":
-					menuActions[pos].setVisible(True)
-					break
-
-			if pos < len(menuActions):
-				before = menuActions[pos]
-				menu.insertAction( before, action )
+		# not found, add a new menu before the help menu
+		if actionMenu == None:
+			menu = QMenu(menuName, self)
+			if helpMenuAction != None:
+				actionMenu = self.menuBar.insertMenu(helpMenuAction, menu)
 			else:
-				menu.addAction( action )
+				actionMenu = self.menuBar.addMenu(menu)
 
-			a.setVisible(True)	# show the menu
+		menu = actionMenu.menu()
+		menuActions = menu.actions()
 
-			if not self._registeredDbActions.has_key(menuName):
-				self._registeredDbActions[menuName] = list()
-			self._registeredDbActions[menuName].append(action)
+		# get the placeholder's position to insert before it
+		pos = 0
+		for pos in range(len(menuActions)):
+			if menuActions[pos].isSeparator() and menuActions[pos].text() == "placeholder":
+				menuActions[pos].setVisible(True)
+				break
 
-			if callback != None:
-				QObject.connect( action, SIGNAL("triggered(bool)"), invoke_callback )
+		if pos < len(menuActions):
+			before = menuActions[pos]
+			menu.insertAction( before, action )
+		else:
+			menu.addAction( action )
 
-			return True
+		actionMenu.setVisible(True)	# show the menu
 
-		return False
+		if not self._registeredDbActions.has_key(menuName):
+			self._registeredDbActions[menuName] = list()
+		self._registeredDbActions[menuName].append(action)
+
+		if callback != None:
+			QObject.connect( action, SIGNAL("triggered(bool)"), invoke_callback )
+
+		return True
+
 
 	def invokeCallback(self, callback):
 		QApplication.setOverrideCursor(Qt.WaitCursor)
