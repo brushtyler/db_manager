@@ -58,7 +58,7 @@ class DbError(BaseError):
 		if self.query == None:
 			return BaseError.__unicode__(self)
 
-		msg = u"Error:\n%s" % self.msg
+		msg = u"Error:\n%s" % BaseError.__unicode__(self)
 		if self.query:
 			msg += u"\n\nQuery:\n%s" % self.query
 		return msg
