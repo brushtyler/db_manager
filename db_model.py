@@ -470,7 +470,7 @@ class DBModel(QAbstractItemModel):
 	QGIS_URI_MIME = "application/x-vnd.qgis.qgis.uri"
 
 	def mimeTypes(self):
-		return QStringList() << self.QGIS_URI_MIME
+		return QStringList() << "text/uri-list" << self.QGIS_URI_MIME
 
 	def mimeData(self, indexes):
 		mimeData = QMimeData()
@@ -497,67 +497,95 @@ class DBModel(QAbstractItemModel):
 		if not self.isImportVectorAvail:
 			return False
 
-		if not data.hasFormat(self.QGIS_URI_MIME):
-			return False
-
-		encodedData = data.data(self.QGIS_URI_MIME)
-		stream = QDataStream(encodedData, QIODevice.ReadOnly)
-
 		added = 0
-		while not stream.atEnd():
-			mimeUri = stream.readQString()
 
-			parts = QStringList() << unicode(mimeUri).split(":", 3)
-			if len(parts) != 4:
-				# invalid qgis mime uri
-				QMessageBox.warning(None, "Invalid MIME uri", "The dropped object is not a valid QGis layer")
-				continue
+		if data.hasUrls():
+			for u in data.urls():
+				filename = u.toLocalFile()
+				if filename.isEmpty():
+					continue
 
-			layerType, providerKey, layerName, uriString = parts
-			if layerType == 'raster':
-				continue
-				inLayer = qgis.core.QgsRasterLayer(uriString, layerName, providerKey)
-			else:
-				inLayer = qgis.core.QgsVectorLayer(uriString, layerName, providerKey)
-			if not inLayer.isValid():
-				# invalid layer
-				QMessageBox.warning(None, "Invalid layer", u"QGis was unable to load the layer %s" % inLayer.name())
-				continue
+				if qgis.core.QgsRasterLayer.isValidRasterFileName( filename ):
+					layerType = 'raster'
+					providerKey = 'gdal'
+				else:
+					layerType = 'vector'
+					providerKey = 'ogr'
 
-			# retrieve information about the new table's db and schema
-			outItem = parent.internalPointer()
-			outObj = outItem.getItemData()
-			outDb = outObj.database()
-			outSchema = None
-			if isinstance(outItem, SchemaItem):
-				outSchema = outObj
-			elif isinstance(outItem, TableItem):
-				outSchema = outObj.schema()
+				layerName = QFileInfo(filename).completeBaseName()
 
-			# toIndex will point to the parent item of the new table
-			toIndex = parent
-			if isinstance(toIndex.internalPointer(), TableItem):
-				toIndex = toIndex.parent()
+				if self.importLayer( layerType, providerKey, layerName, filename, parent ):
+					added += 1
 
-			if inLayer.type() == inLayer.VectorLayer:
-				# create the output uri
-				schema = outSchema.name if outDb.schemas() != None and outSchema != None else QString()
-				pkCol = geomCol = QString()
+		if data.hasFormat(self.QGIS_URI_MIME):
+			encodedData = data.data(self.QGIS_URI_MIME)
+			stream = QDataStream(encodedData, QIODevice.ReadOnly)
 
-				# default pk and geom field name value
-				if providerKey in ['postgres', 'spatialite']:
-					inUri = qgis.core.QgsDataSourceURI( inLayer.source() )
-					pkCol = inUri.keyColumn()
-					geomCol = inUri.geometryColumn()
+			while not stream.atEnd():
+				mimeUri = stream.readQString()
 
-				outUri = outDb.uri()
-				outUri.setDataSource( schema, layerName, geomCol, QString(), pkCol )
+				parts = QStringList() << unicode(mimeUri).split(":", 3)
+				if len(parts) != 4:
+					# invalid qgis mime uri
+					QMessageBox.warning(None, "Invalid MIME uri", "The dropped object is not a valid QGis layer")
+					continue
 
-				added = added + 1
-				self.emit( SIGNAL("importVector"), inLayer, outDb, outUri, toIndex )
+				layerType, providerKey, layerName, uriString = parts
+
+				if self.importLayer( layerType, providerKey, layerName, uriString, parent ):
+					added += 1
 
 		return added > 0
 
+
+	def importLayer(self, layerType, providerKey, layerName, uriString, parent):
+		if not self.isImportVectorAvail:
+			return False
+
+		if layerType == 'raster':
+			return False	# not implemented yet
+			inLayer = qgis.core.QgsRasterLayer(uriString, layerName, providerKey)
+		else:
+			inLayer = qgis.core.QgsVectorLayer(uriString, layerName, providerKey)
+
+		if not inLayer.isValid():
+			# invalid layer
+			QMessageBox.warning(None, "Invalid layer", u"QGis was unable to load the layer %s" % inLayer.name())
+			return False
+
+		# retrieve information about the new table's db and schema
+		outItem = parent.internalPointer()
+		outObj = outItem.getItemData()
+		outDb = outObj.database()
+		outSchema = None
+		if isinstance(outItem, SchemaItem):
+			outSchema = outObj
+		elif isinstance(outItem, TableItem):
+			outSchema = outObj.schema()
+
+		# toIndex will point to the parent item of the new table
+		toIndex = parent
+		if isinstance(toIndex.internalPointer(), TableItem):
+			toIndex = toIndex.parent()
+
+		if inLayer.type() == inLayer.VectorLayer:
+			# create the output uri
+			schema = outSchema.name if outDb.schemas() != None and outSchema != None else QString()
+			pkCol = geomCol = QString()
+
+			# default pk and geom field name value
+			if providerKey in ['postgres', 'spatialite']:
+				inUri = qgis.core.QgsDataSourceURI( inLayer.source() )
+				pkCol = inUri.keyColumn()
+				geomCol = inUri.geometryColumn()
+
+			outUri = outDb.uri()
+			outUri.setDataSource( schema, layerName, geomCol, QString(), pkCol )
+
+			self.emit( SIGNAL("importVector"), inLayer, outDb, outUri, toIndex )
+			return True
+
+		return False
 
 	def importVector(self, inLayer, outDb, outUri, parent):
 		if not self.isImportVectorAvail:
