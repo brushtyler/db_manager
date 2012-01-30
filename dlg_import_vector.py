@@ -190,11 +190,17 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 			enc = self.cboEncoding.currentText()
 			self.inLayer.setProviderEncoding( enc )
 
-		ret, errMsg = qgis.core.QgsVectorLayerImport.importLayer( self.inLayer, uri, providerName, outCrs )
+		options = {}
+		if self.radCreate.isChecked() and self.chkDropTable.isChecked():
+			options['overwrite'] = True
+		elif self.radAppend.isChecked():
+			options['append'] = True
+
+		ret, errMsg = qgis.core.QgsVectorLayerImport.importLayer( self.inLayer, uri, providerName, outCrs, False, False, options )
 		QApplication.restoreOverrideCursor()
 		if ret != 0:
 			QMessageBox.warning(self, "Error [%d]" % ret, errMsg )
-			return self.reject()
+			return
 
 		if self.chkGeomColumn.isChecked() and self.chkSpatialIndex.isChecked():
 			self.db.connector.createSpatialIndex( (schema, table), geom )
