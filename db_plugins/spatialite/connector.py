@@ -261,7 +261,8 @@ class SpatiaLiteDBConnector(DBConnector):
 	def getTableRowCount(self, table):
 		c = self._get_cursor()
 		self._execute(c, u"SELECT COUNT(*) FROM %s" % self.quoteId(table) )
-		return c.fetchone()[0]
+		ret = c.fetchone()
+		return ret[0] if ret is not None else None
 
 	def getTableFields(self, table):
 		""" return list of columns in table """
@@ -325,24 +326,23 @@ class SpatiaLiteDBConnector(DBConnector):
 		""" returns definition of the view """
 		schema, tablename = self.getSchemaTableName(view)
 		sql = u"SELECT sql FROM sqlite_master WHERE type = 'view' AND name = %s" % self.quoteString(tablename)
-		c = self._get_cursor()
-		self._execute(c, sql)
-		return c.fetchone()[0]
+		c = self._execute(None, sql)
+		ret = c.fetchone()
+		return ret[0] if ret is not None else None
 
 	def getSpatialRefInfo(self, srid):
 		sql = u"SELECT ref_sys_name FROM spatial_ref_sys WHERE srid = %s" % self.quoteString(srid)
-		c = self._get_cursor()
-		self._execute(c, sql)
-		return c.fetchone()[0]
-
+		c = self._execute(None, sql)
+		ret = c.fetchone()
+		return ret[0] if ret is not None else None
 
 	def isVectorTable(self, table):
 		if self.has_geometry_columns:
-			c = self._get_cursor()
 			schema, tablename = self.getSchemaTableName(table)
 			sql = u"SELECT count(*) FROM geometry_columns WHERE f_table_name = %s" % self.quoteString(tablename)
-			self._execute(c, sql)
-			return c.fetchone()[0] > 0
+			c = self._execute(None, sql)
+			ret = c.fetchone()
+			return res != None and ret[0] > 0
 		return True
 
 	def isRasterTable(self, table):
@@ -351,13 +351,14 @@ class SpatiaLiteDBConnector(DBConnector):
 			if not QString(tablename).endsWith( "_rasters" ):
 				return False
 
-			c = self._get_cursor()
 			sql = u"""SELECT count(*) 
 					FROM layer_params AS r JOIN geometry_columns AS g 
 						ON r.table_name||'_metadata' = g.f_table_name
 					WHERE r.table_name = REPLACE(%s, '_rasters', '')""" % self.quoteString(tablename)
-			self._execute(c, sql)
-			return c.fetchone()[0] > 0
+			c = self._execute(None, sql)
+			ret = c.fetchone()
+			return res != None and ret[0] > 0
+
 		return False
 
 
