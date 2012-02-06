@@ -50,6 +50,7 @@ class SLTableDataModel(TableDataModel):
 		# get fields, ignore geometry columns
 		dataType = field.dataType.upper()
 		if dataType[:5] == "MULTI": dataType = dataType[5:]
+		if dataType[-3:] == "25D": dataType = dataType[:-3]
 		if dataType[-10:] == "COLLECTION": dataType = dataType[:-10]
 		if dataType in ["POINT", "LINESTRING", "POLYGON", "GEOMETRY"]:
 			return u'GeometryType(%s)' % self.db.quoteId(field.name)

@@ -257,25 +257,33 @@ class Database(DbItemObject):
 		elif isinstance(item, Table):
 			self.deleteTableActionSlot(item, action, parent)
 		else:
+			QApplication.restoreOverrideCursor()
 			QMessageBox.information(parent, "Sorry", "Cannot delete the selected item.")
+			QApplication.setOverrideCursor(Qt.WaitCursor)
 
 
 	def createSchemaActionSlot(self, item, action, parent):
+		QApplication.restoreOverrideCursor()
 		if not isinstance(item, (DBPlugin, Schema, Table)) or item.database() == None:
 			QMessageBox.information(parent, "Sorry", "No database selected or you are not connected to it.")
 			return
 		(schema, ok) = QInputDialog.getText(parent, "New schema", "Enter new schema name")
 		if not ok:
 			return
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+
 		self.createSchema(schema)
 
 	def deleteSchemaActionSlot(self, item, action, parent):
+		QApplication.restoreOverrideCursor()
 		if not isinstance(item, Schema):
 			QMessageBox.information(parent, "Sorry", "Select an empty SCHEMA for deletion.")
 			return
 		res = QMessageBox.question(parent, "hey!", u"Really delete schema %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
 		if res != QMessageBox.Yes:
 			return
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+
 		item.delete()
 
 	def schemasFactory(self, row, db):
@@ -293,35 +301,45 @@ class Database(DbItemObject):
 
 
 	def createTableActionSlot(self, item, action, parent):
+		QApplication.restoreOverrideCursor()
 		if not hasattr(item, 'database') or item.database() == None:
 			QMessageBox.information(parent, "Sorry", "No database selected or you are not connected to it.")
 			return
 		from ..dlg_create_table import DlgCreateTable
 		DlgCreateTable(item, parent).exec_()
+		QApplication.setOverrideCursor(Qt.WaitCursor)
 
 	def editTableActionSlot(self, item, action, parent):
+		QApplication.restoreOverrideCursor()
 		if not isinstance(item, Table) or item.isView:
 			QMessageBox.information(parent, "Sorry", "Select a TABLE for editation.")
 			return
 		from ..dlg_table_properties import DlgTableProperties
 		DlgTableProperties(item, parent).exec_()
+		QApplication.setOverrideCursor(Qt.WaitCursor)
 
 	def deleteTableActionSlot(self, item, action, parent):
+		QApplication.restoreOverrideCursor()
 		if not isinstance(item, Table):
 			QMessageBox.information(parent, "Sorry", "Select a TABLE/VIEW for deletion.")
 			return
 		res = QMessageBox.question(parent, "hey!", u"Really delete table/view %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
 		if res != QMessageBox.Yes:
 			return
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+
 		item.delete()
 
 	def emptyTableActionSlot(self, item, action, parent):
+		QApplication.restoreOverrideCursor()
 		if not isinstance(item, Table) or item.isView:
 			QMessageBox.information(parent, "Sorry", "Select a TABLE to empty it.")
 			return
 		res = QMessageBox.question(parent, "hey!", u"Really delete all items from table %s ?" % item.name, QMessageBox.Yes | QMessageBox.No)
 		if res != QMessageBox.Yes:
 			return
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+
 		item.empty()
 
 	def prepareMenuMoveTableToSchemaActionSlot(self, item, menu, mainWindow):
@@ -333,9 +351,12 @@ class Database(DbItemObject):
 			action = menu.addAction(schema.name, slot(schema))
 		
 	def moveTableToSchemaActionSlot(self, item, schema, parent):
+		QApplication.restoreOverrideCursor()
 		if not isinstance(item, Table):
 			QMessageBox.information(parent, "Sorry", "Select a TABLE/VIEW.")
 			return
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+
 		item.moveToSchema(schema)
 
 
@@ -700,9 +721,11 @@ class Table(DbItemObject):
 			parts = action.split('/')
 			trigger_action = parts[1]
 
+			QApplication.restoreOverrideCursor()
 			msg = u"Do you want to %s all triggers?" % trigger_action
 			if QMessageBox.question(None, "Table triggers", msg, QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
 				return False
+			QApplication.setOverrideCursor(Qt.WaitCursor)
 
 			if trigger_action == "enable" or trigger_action == "disable":
 				enable = trigger_action == "enable"
@@ -715,9 +738,11 @@ class Table(DbItemObject):
 			trigger_name = parts[1]
 			trigger_action = parts[2]
 
+			QApplication.restoreOverrideCursor()
 			msg = u"Do you want to %s trigger %s?" % (trigger_action, trigger_name)
 			if QMessageBox.question(None, "Table trigger", msg, QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
 				return False
+			QApplication.setOverrideCursor(Qt.WaitCursor)
 
 			if trigger_action == "delete":
 				self.database().connector.deleteTableTrigger(trigger_name, (self.schemaName(), self.name) )
@@ -799,9 +824,11 @@ class VectorTable(Table):
 			parts = action.split('/')
 			spatialIndex_action = parts[1]
 
+			QApplication.restoreOverrideCursor()
 			msg = u"Do you want to %s spatial index for field %s?" % ( spatialIndex_action, self.geomColumn )
 			if QMessageBox.question(None, "Spatial Index", msg, QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
 				return False
+			QApplication.setOverrideCursor(Qt.WaitCursor)
 
 			if spatialIndex_action == "create":
 				self.createSpatialIndex()
