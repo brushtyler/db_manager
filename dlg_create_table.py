@@ -86,16 +86,10 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 		self.item = item
 		self.setupUi(self)
 
-		if self.item == None:
-			self.db = None
-			self.schemas = ['public', 'test']
-			self.hasSchemas = True
-			self.fieldTypes = ['integer', 'float', 'varchar(n)']
-		else:
-			self.db = self.item.database()
-			self.schemas = self.db.schemas()
-			self.hasSchemas = self.schemas != None
-			self.fieldTypes = self.db.connector.fieldTypes()
+		self.db = self.item.database()
+		self.schemas = self.db.schemas()
+		self.hasSchemas = self.schemas != None
+		self.fieldTypes = self.db.connector.fieldTypes()
 
 		m = TableFieldsModel(self, True)	# it's editable
 		self.fields.setModel(m)
@@ -190,7 +184,12 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 		indexNull = m.index(newRow,2,QModelIndex())
 		
 		m.setData(indexName, QVariant("new_field"))
-		m.setData(indexType, QVariant( self.fieldTypes[0] if len(self.fieldTypes) > 0 else "integer" ))
+		colType = self.fieldTypes[0]
+		if newRow == 0:
+			# adding the first row, use auto-incrementing column type if any
+			if "serial" in self.fieldTypes:	# PostgreSQL
+				colType = "serial"
+		m.setData(indexType, QVariant(colType))
 		m.setData(indexNull, QVariant(False))
 		
 		# selects the new row
@@ -298,36 +297,21 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 		if pk_index >= 0:
 			flds[ pk_index ].primaryKey = True
 
-		if self.db != None:
-			# commit to DB
-			QApplication.setOverrideCursor(Qt.WaitCursor)
-			try:
-				if not useGeomColumn:
-					self.db.createTable(table, flds, schema)
-				else:
-					geom = geomColumn, geomType, geomSrid, geomDim, useSpatialIndex
-					self.db.createVectorTable(table, flds, geom, schema)
+		# commit to DB
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+		try:
+			if not useGeomColumn:
+				self.db.createTable(table, flds, schema)
+			else:
+				geom = geomColumn, geomType, geomSrid, geomDim, useSpatialIndex
+				self.db.createVectorTable(table, flds, geom, schema)
 
-			except DbError, e:
-				DlgDbError.showError(e, self)
-				return
+		except DbError, e:
+			DlgDbError.showError(e, self)
+			return
 
-			finally:
-				QApplication.restoreOverrideCursor()
-
-		else:
-			print "table:", table
-			print "fields:", u", ".join(map(lambda x: x.definitions(), flds))
-			print "pk:", map(lambda x: x.name, filter(lambda x: x.primaryKey, flds))
-			if useGeomColumn:
-				print "geom:", geomType, " >> ", geomColumn
+		finally:
+			QApplication.restoreOverrideCursor()
 
 		QMessageBox.information(self, "Good", "everything went fine")
 
-
-if __name__ == '__main__':
-	import sys
-	a = QApplication(sys.argv)
-	dlg = DlgCreateTable()
-	dlg.show()
-	sys.exit(a.exec_())
