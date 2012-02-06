@@ -549,7 +549,8 @@ class PostGisDBConnector(DBConnector):
 						JOIN pg_namespace nsp ON c.relnamespace = nsp.oid
 		        WHERE relname=%s %s AND relkind='v' """ % (self.quoteString(tablename), schema_where)
 		c = self._execute(None, sql)
-		return ret[0] if ret is not None else None
+		res = c.fetchone()
+		return res[0] if res is not None else None
 
 	def getSpatialRefInfo(self, srid):
 		if not self.has_spatial:
@@ -576,8 +577,8 @@ class PostGisDBConnector(DBConnector):
 			schema, tablename = self.getSchemaTableName(table)
 			sql = u"SELECT count(*) FROM geometry_columns WHERE f_table_schema = %s AND f_table_name = %s" % (self.quoteString(schema), self.quoteString(tablename))
 			c = self._execute(None, sql)
-			ret = c.fetchone()
-			return res != None and ret[0] > 0
+			res = c.fetchone()
+			return res != None and res[0] > 0
 		return False
 
 	def isRasterTable(self, table):
@@ -585,8 +586,8 @@ class PostGisDBConnector(DBConnector):
 			schema, tablename = self.getSchemaTableName(table)
 			sql = u"SELECT count(*) FROM raster_columns WHERE r_table_schema = %s AND r_table_name = %s" % (self.quoteString(schema), self.quoteString(tablename))
 			c = self._execute(None, sql)
-			ret = c.fetchone()
-			return res != None and ret[0] > 0
+			res = c.fetchone()
+			return res != None and res[0] > 0
 		return False		
 
 
