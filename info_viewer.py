@@ -31,7 +31,9 @@ class InfoViewer(QTextBrowser):
 	def __init__(self, parent=None):
 		QTextBrowser.__init__(self, parent)
 		self.setOpenLinks(False)
+
 		self.item = None
+		self.dirty = False
 
 		self._clear()
 		self.connect(self, SIGNAL("anchorClicked(const QUrl&)"), self._linkClicked)
@@ -53,10 +55,11 @@ class InfoViewer(QTextBrowser):
 
 
 	def refresh(self):
-		self.showInfo( self.item, True )		
+		self.setDirty(True)
+		self.showInfo( self.item )		
 
-	def showInfo(self, item, force=False):
-		if item == self.item and not force: 
+	def showInfo(self, item):
+		if item == self.item and not self.dirty: 
 			return
 		self._clear()
 		if item is None:
@@ -72,14 +75,16 @@ class InfoViewer(QTextBrowser):
 			return
 
 		self.item = item
-		self.connect(self.item, SIGNAL('aboutToChange'), self._clear)
-		self.connect(self.item, SIGNAL('changed'), self.refresh)
+		self.connect(self.item, SIGNAL('aboutToChange'), self.setDirty)
 
+	def setDirty(self, val=True):
+		self.dirty = val
 
 	def _clear(self):
 		if self.item is not None:
-			self.disconnect(self.item, SIGNAL('aboutToChange'), self._clear)
-			self.disconnect(self.item, SIGNAL('changed'), self.refresh)
+			self.disconnect(self.item, SIGNAL('aboutToChange'), self.setDirty)
+		self.item = None
+		self.dirty = False
 
 		self.item = None
 		self.setHtml("")

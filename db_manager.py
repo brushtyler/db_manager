@@ -154,6 +154,12 @@ class DBManager(QMainWindow):
 			self.preview.loadPreview( item )
 
 
+	def refreshActionSlot(self):
+		self.info.setDirty()
+		self.table.setDirty()
+		self.preview.setDirty()
+		self.refreshItem()
+
 	def runSqlWindow(self):
 		db = self.tree.currentDatabase()
 		if db == None:
@@ -352,7 +358,7 @@ class DBManager(QMainWindow):
 
 		# menu DATABASE
 		sep = self.menuDb.addAction("placeholder"); sep.setSeparator(True); sep.setVisible(False)
-		self.actionRefresh = self.menuDb.addAction( QIcon(":/db_manager/actions/refresh"), "&Refresh", self.refreshItem, QKeySequence("F5") )
+		self.actionRefresh = self.menuDb.addAction( QIcon(":/db_manager/actions/refresh"), "&Refresh", self.refreshActionSlot, QKeySequence("F5") )
 		self.actionSqlWindow = self.menuDb.addAction( QIcon(":/db_manager/actions/sql_window"), "&SQL window", self.runSqlWindow, QKeySequence("F2") )
 		self.menuDb.addSeparator()
 		self.actionClose = self.menuDb.addAction( QIcon(), "&Exit", self.close, QKeySequence("CTRL+Q") )

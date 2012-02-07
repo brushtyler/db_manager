@@ -32,7 +32,9 @@ class LayerPreview(QgsMapCanvas):
 	def __init__(self, parent=None):
 		QgsMapCanvas.__init__(self, parent)
 		self.setCanvasColor(QColor(255,255,255))
+
 		self.item = None
+		self.dirty = False
 
 		# reuse settings from QGIS
 		settings = QSettings()
@@ -46,10 +48,11 @@ class LayerPreview(QgsMapCanvas):
 
 
 	def refresh(self):
-		self.loadPreview( self.item, True )
+		self.setDirty(True)
+		self.loadPreview( self.item )		
 
 	def loadPreview(self, item, force=False):
-		if item == self.item and not force: 
+		if item == self.item and not self.dirty: 
 			return
 		self._clear()
 		if item is None:
@@ -63,17 +66,18 @@ class LayerPreview(QgsMapCanvas):
 			return
 
 		self.item = item
-		self.connect(self.item, SIGNAL('aboutToChange'), self._clear)
-		self.connect(self.item, SIGNAL('changed'), self.refresh)
+		self.connect(self.item, SIGNAL('aboutToChange'), self.setDirty)
 
+	def setDirty(self, val=True):
+		self.dirty = val
 
 	def _clear(self):
 		""" remove any layers from preview canvas """
 		if self.item is not None:
-			self.disconnect(self.item, SIGNAL('aboutToChange'), self._clear)
-			self.disconnect(self.item, SIGNAL('changed'), self.refresh)
-
+			self.disconnect(self.item, SIGNAL('aboutToChange'), self.setDirty)
 		self.item = None
+		self.dirty = False
+
 		self.currentLayerId = None
 		self.setLayerSet( [] )
 
