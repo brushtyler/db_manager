@@ -26,7 +26,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from .db_plugins.data_model import TableFieldsModel, TableConstraintsModel, TableIndexesModel
-from .db_plugins.plugin import DbError
+from .db_plugins.plugin import BaseError
 from .dlg_db_error import DlgDbError
 
 from dlg_field_properties import DlgFieldProperties
@@ -120,7 +120,7 @@ class DlgTableProperties(QDialog, Ui_DlgTableProperties):
 			# add column to table
 			self.table.addField(fld)
 			self.populateViews()
-		except DbError, e:
+		except BaseError, e:
 			DlgDbError.showError(e, self)
 			return
 		finally:
@@ -154,7 +154,7 @@ class DlgTableProperties(QDialog, Ui_DlgTableProperties):
 		try:
 			fld.update(new_fld.name, new_fld.type2String(), new_fld.notNull, new_fld.default2String())
 			self.populateViews()
-		except DbError, e:
+		except BaseError, e:
 			DlgDbError.showError(e, self)
 			return
 		finally:
@@ -178,7 +178,7 @@ class DlgTableProperties(QDialog, Ui_DlgTableProperties):
 		try:
 			fld.delete()
 			self.populateViews()
-		except DbError, e:
+		except BaseError, e:
 			DlgDbError.showError(e, self)
 			return
 		finally:
@@ -232,7 +232,7 @@ class DlgTableProperties(QDialog, Ui_DlgTableProperties):
 		try:
 			constr.delete()
 			self.populateViews()
-		except DbError, e:
+		except BaseError, e:
 			DlgDbError.showError(e, self)
 			return
 		finally:
@@ -292,7 +292,7 @@ class DlgTableProperties(QDialog, Ui_DlgTableProperties):
 		try:
 			self.table.createSpatialIndex()
 			self.populateViews()
-		except DbError, e:
+		except BaseError, e:
 			DlgDbError.showError(e, self)
 			return
 		finally:
@@ -325,7 +325,7 @@ class DlgTableProperties(QDialog, Ui_DlgTableProperties):
 		try:
 			idx.delete()
 			self.populateViews()
-		except DbError, e:
+		except BaseError, e:
 			DlgDbError.showError(e, self)
 			return
 		finally:
