@@ -32,7 +32,7 @@ from .layer_preview import LayerPreview
 from .db_tree import DBTree
 
 from .db_plugins import getDbPluginErrors
-from .db_plugins.plugin import BaseError, Table
+from .db_plugins.plugin import BaseError
 from .dlg_db_error import DlgDbError
 
 
@@ -140,14 +140,14 @@ class DBManager(QMainWindow):
 
 		# enable/disable tabs
 		self.tabs.setTabEnabled( self.tabs.indexOf(self.table), table != None )
-		self.tabs.setTabEnabled( self.tabs.indexOf(self.preview), table != None and table.type in [Table.VectorType, Table.RasterType] and table.geomColumn != None )
+		self.tabs.setTabEnabled( self.tabs.indexOf(self.preview), table != None and table.type in [table.VectorType, table.RasterType] and table.geomColumn != None )
 		# show the info tab if the current tab is disabled
 		if not self.tabs.isTabEnabled( index ):
 			self.tabs.setCurrentWidget( self.info )
 
 		current_tab = self.tabs.currentWidget()
 		if current_tab == self.info:
-			self.info.showInfo( item, True ) # force refresh
+			self.info.showInfo( item )
 		elif current_tab == self.table:
 			self.table.loadData( item )
 		elif current_tab == self.preview:
