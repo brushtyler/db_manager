@@ -165,10 +165,12 @@ class PGDatabase(Database):
 
 	def runVacuumAnalyzeActionSlot(self, item, action, parent):
 		QApplication.restoreOverrideCursor()
-		if not isinstance(item, Table) or item.isView:
-			QMessageBox.information(parent, "Sorry", "Select a TABLE for vacuum analyze.")
-			return
-		QApplication.setOverrideCursor(Qt.WaitCursor)
+		try:
+			if not isinstance(item, Table) or item.isView:
+				QMessageBox.information(parent, "Sorry", "Select a TABLE for vacuum analyze.")
+				return
+		finally:
+			QApplication.setOverrideCursor(Qt.WaitCursor)
 
 		item.runVacuumAnalyze()
 
@@ -205,9 +207,12 @@ class PGTable(Table):
 			rule_action = parts[2]
 
 			msg = u"Do you want to %s rule %s?" % (rule_action, rule_name)
-			if QMessageBox.question(None, "Table rule", msg, QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
-				return False
-			QApplication.setOverrideCursor(Qt.WaitCursor)
+			QApplication.restoreOverrideCursor()
+			try:
+				if QMessageBox.question(None, "Table rule", msg, QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
+					return False
+			finally:
+				QApplication.setOverrideCursor(Qt.WaitCursor)
 
 			if rule_action == "delete":
 				self.database().connector.deleteTableRule(rule_name, (self.schemaName(), self.name))

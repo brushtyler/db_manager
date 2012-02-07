@@ -114,10 +114,12 @@ class SLDatabase(Database):
 
 	def runVacuumActionSlot(self, item, action, parent):
 		QApplication.restoreOverrideCursor()
-		if not isinstance(item, (DBPlugin, Table)) or item.database() == None:
-			QMessageBox.information(parent, "Sorry", "No database selected or you are not connected to it.")
-			return
-		QApplication.setOverrideCursor(Qt.WaitCursor)
+		try:
+			if not isinstance(item, (DBPlugin, Table)) or item.database() == None:
+				QMessageBox.information(parent, "Sorry", "No database selected or you are not connected to it.")
+				return
+		finally:
+			QApplication.setOverrideCursor(Qt.WaitCursor)
 
 		self.runVacuum()
 
