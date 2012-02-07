@@ -364,15 +364,15 @@ class Database(DbItemObject):
 			action = menu.addAction(schema.name, slot(schema))
 		
 	def moveTableToSchemaActionSlot(self, item, schema, parent):
-		QApplication.restoreOverrideCursor()
-		try:
-			if not isinstance(item, Table):
-				QMessageBox.information(parent, "Sorry", "Select a TABLE/VIEW.")
-				return
-		finally:
-			QApplication.setOverrideCursor(Qt.WaitCursor)
+		if not isinstance(item, Table):
+			QMessageBox.information(parent, "Sorry", "Select a TABLE/VIEW.")
+			return
 
-		item.moveToSchema(schema)
+		QApplication.setOverrideCursor(Qt.WaitCursor)
+		try:
+			item.moveToSchema(schema)
+		finally:
+			QApplication.restoreOverrideCursor()
 
 
 	def tablesFactory(self, row, db, schema=None):
