@@ -189,6 +189,7 @@ class PGTable(Table):
 		self.estimatedRowCount = int(self.estimatedRowCount)
 
 	def runVacuumAnalyze(self):
+		self.aboutToChange()
 		self.database().connector.runVacuumAnalyze( (self.schemaName(), self.name) )
 		# TODO: change only this item, not re-create all the tables in the schema/database
 		self.schema().refresh() if self.schema() else self.database().refresh()
@@ -215,6 +216,7 @@ class PGTable(Table):
 				QApplication.setOverrideCursor(Qt.WaitCursor)
 
 			if rule_action == "delete":
+				self.aboutToChange()
 				self.database().connector.deleteTableRule(rule_name, (self.schemaName(), self.name))
 				self.refreshRules()
 				return True

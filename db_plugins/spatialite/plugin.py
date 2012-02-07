@@ -124,6 +124,7 @@ class SLDatabase(Database):
 		self.runVacuum()
 
 	def runVacuum(self):
+		self.database().aboutToChange()
 		self.database().connector.runVacuum()
 		self.database().refresh()
 
@@ -176,12 +177,14 @@ class SLVectorTable(SLTable, VectorTable):
 		return self.database().connector.hasSpatialIndex( (self.schemaName(), self.name), geom_column )
 		
 	def createSpatialIndex(self, geom_column=None):
+		self.aboutToChange()
 		ret = VectorTable.createSpatialIndex(self, geom_column)
 		if ret != False:
 			self.database().refresh()
 		return ret
 
 	def deleteSpatialIndex(self, geom_column=None):
+		self.aboutToChange()
 		ret = VectorTable.deleteSpatialIndex(self, geom_column)
 		if ret != False:
 			self.database().refresh()
