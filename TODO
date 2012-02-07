@@ -2,7 +2,8 @@ DB Manager TODO and DONE list.
 
 
 DONE:
-* fix pgraster support, improve error handling running a query in sql window (v0.1.14)
+* close transactions before doing changes to tables (v0.1.15)
+* improve error handling running a query in sql window (v0.1.14)
 * fix error dialog (v0.1.13)
 * improve error handling, add Re-connect button (v0.1.12)
 * add "Run Vacuum" and "Move to schema" to menu (v0.1.11)
