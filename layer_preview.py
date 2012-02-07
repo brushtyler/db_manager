@@ -32,6 +32,7 @@ class LayerPreview(QgsMapCanvas):
 	def __init__(self, parent=None):
 		QgsMapCanvas.__init__(self, parent)
 		self.setCanvasColor(QColor(255,255,255))
+		self.item = None
 
 		# reuse settings from QGIS
 		settings = QSettings()
@@ -51,18 +52,19 @@ class LayerPreview(QgsMapCanvas):
 		if item == self.item and not force: 
 			return
 		self._clear()
-
 		if item is None:
 			return
-
-		self.item = item
-		self.connect(self.item, SIGNAL('aboutToChange'), self._clear)
-		self.connect(self.item, SIGNAL('changed'), self.refresh)
 
 		if isinstance(item, Table) and item.type in [Table.VectorType, Table.RasterType]:
 			# update the preview, but first let the manager chance to show the canvas
 			runPrev = lambda: self._loadTablePreview( item )
 			QTimer.singleShot(50, runPrev)
+		else:
+			return
+
+		self.item = item
+		self.connect(self.item, SIGNAL('aboutToChange'), self._clear)
+		self.connect(self.item, SIGNAL('changed'), self.refresh)
 
 
 	def _clear(self):
