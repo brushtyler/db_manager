@@ -32,6 +32,8 @@ class TableViewer(QTableView):
 		self.setSelectionBehavior( QAbstractItemView.SelectRows )
 		self.setSelectionMode( QAbstractItemView.ExtendedSelection )
 
+		self.item = None
+
 		# allow to copy results
 		copyAction = QAction("copy", self)
 		self.addAction( copyAction )
@@ -47,12 +49,21 @@ class TableViewer(QTableView):
 		if item == self.item and not force: 
 			return
 		self._clear()
+		if item is None:
+			return
 
 		self.item = item
+		self.connect(self.item, SIGNAL('aboutToChange'), self._clear)
+		self.connect(self.item, SIGNAL('changed'), self.refresh)
+
 		if isinstance(item, Table):
 			self._loadTableData( item )
 
 	def _clear(self):
+		if self.item is not None:
+			self.disconnect(self.item, SIGNAL('aboutToChange'), self._clear)
+			self.disconnect(self.item, SIGNAL('changed'), self.refresh)
+
 		self.item = None
 
 		# delete the old model

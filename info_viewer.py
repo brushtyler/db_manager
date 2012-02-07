@@ -57,8 +57,13 @@ class InfoViewer(QTextBrowser):
 		if item == self.item and not force: 
 			return
 		self._clear()
+		if item is None:
+			return
 
 		self.item = item
+		self.connect(self.item, SIGNAL('aboutToChange'), self._clear)
+		self.connect(self.item, SIGNAL('changed'), self.refresh)
+
 		if isinstance(item, DBPlugin):
 			self._showDatabaseInfo(item)
 		elif isinstance(item, Schema):
@@ -67,6 +72,10 @@ class InfoViewer(QTextBrowser):
 			self._showTableInfo(item)
 
 	def _clear(self):
+		if self.item is not None:
+			self.disconnect(self.item, SIGNAL('aboutToChange'), self._clear)
+			self.disconnect(self.item, SIGNAL('changed'), self.refresh)
+
 		self.item = None
 		self.setHtml("")
 

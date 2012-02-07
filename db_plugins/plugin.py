@@ -145,6 +145,9 @@ class DbItemObject(QObject):
 	def refresh(self):
 		self.emit( SIGNAL('changed') )	# refresh the item data reading them from the db
 
+	def aboutToChange(self):
+		self.emit( SIGNAL('aboutToChange') )
+
 	def info(self):
 		pass
 
@@ -315,7 +318,10 @@ class Database(DbItemObject):
 			QMessageBox.information(parent, "Sorry", "Select a TABLE for editation.")
 			return
 		from ..dlg_table_properties import DlgTableProperties
-		DlgTableProperties(item, parent).exec_()
+		dlg = DlgTableProperties(item, parent)
+		self.connect(dlg, SIGNAL("aboutToChangeTable"), item.aboutToChange)
+		dlg.exec_()
+		self.disconnect(dlg, SIGNAL("aboutToChangeTable"), item.aboutToChange)
 		QApplication.setOverrideCursor(Qt.WaitCursor)
 
 	def deleteTableActionSlot(self, item, action, parent):
@@ -436,12 +442,14 @@ class Schema(DbItemObject):
 		return self.database().tables(self)
 
 	def delete(self):
+		self.aboutToChange()
 		ret = self.database().connector.deleteSchema(self.name)
 		if ret != False:
 			self.emit( SIGNAL('deleted') )
 		return ret
 
 	def rename(self, new_name):
+		self.aboutToChange()
 		ret = self.database().connector.renameSchema(self.name, new_name)
 		if ret != False:
 			self.refresh()
@@ -485,6 +493,7 @@ class Table(DbItemObject):
 
 
 	def delete(self):
+		self.aboutToChange()
 		if self.isView:
 			ret = self.database().connector.deleteView( (self.schemaName(), self.name) )
 		else:
@@ -494,6 +503,7 @@ class Table(DbItemObject):
 		return ret
 
 	def rename(self, new_name):
+		self.aboutToChange()
 		ret = self.database().connector.renameTable( (self.schemaName(), self.name), new_name)
 		if ret != False:
 			self.name = new_name
@@ -501,12 +511,14 @@ class Table(DbItemObject):
 		return ret
 
 	def empty(self):
+		self.aboutToChange()
 		ret = self.database().connector.emptyTable( (self.schemaName(), self.name) )
 		if ret != False:
 			self.refreshRowCount()
 		return ret
 
 	def moveToSchema(self, schema):
+		self.aboutToChange()
 		if self.schema() == schema:
 			return True
 		ret = self.database().connector.moveTableToSchema( (self.schemaName(), self.name), schema.name )
@@ -582,18 +594,21 @@ class Table(DbItemObject):
 		self.refresh()
 
 	def addField(self, fld):
+		self.aboutToChange()
 		ret = self.database().connector.addTableColumn( (self.schemaName(), self.name), fld.definition())
 		if ret != False:
 			self.refreshFields()
 		return ret
 
 	def deleteField(self, fld):
+		self.aboutToChange()
 		ret = self.database().connector.deleteTableColumn( (self.schemaName(), self.name), fld.name)
 		if ret != False:
 			self.refreshFields()
 		return ret
 
 	def addGeometryColumn(self, geomCol, geomType, srid, dim, createSpatialIndex=False):
+		self.aboutToChange()
 		ret = self.database().connector.addGeometryColumn( (self.schemaName(), self.name), geomCol, geomType, srid, dim)
 		if ret == False:
 			return False
@@ -624,6 +639,7 @@ class Table(DbItemObject):
 		self.refresh()
 
 	def addConstraint(self, constr):
+		self.aboutToChange()
 		if constr.type == TableConstraint.TypePrimaryKey:
 			ret = self.database().connector.addTablePrimaryKey( (self.schemaName(), self.name), constr.fields()[constr.columns[0]].name)
 		elif constr.type == TableConstraint.TypeUnique:
@@ -635,6 +651,7 @@ class Table(DbItemObject):
 		return ret
 
 	def deleteConstraint(self, constr):
+		self.aboutToChange()
 		ret = self.database().connector.deleteTableConstraint( (self.schemaName(), self.name), constr.name)
 		if ret != False:
 			self.refreshConstraints()
@@ -656,12 +673,14 @@ class Table(DbItemObject):
 		self.refresh()
 
 	def addIndex(self, idx):
+		self.aboutToChange()
 		ret = self.database().connector.createTableIndex( (self.schemaName(), self.name), idx.name, idx.fields()[idx.columns[0]].name)
 		if ret != False:
 			self.refreshIndexes()
 		return ret
 
 	def deleteIndex(self, idx):
+		self.aboutToChange()
 		ret = self.database().connector.deleteTableIndex( (self.schemaName(), self.name), idx.name)
 		if ret != False:
 			self.refreshIndexes()
@@ -699,6 +718,7 @@ class Table(DbItemObject):
 
 
 	def refreshRowCount(self):
+		self.aboutToChange()
 		prevRowCount = self.rowCount
 		try:
 			self.rowCount = self.database().connector.getTableRowCount( (self.schemaName(), self.name) )
@@ -729,6 +749,7 @@ class Table(DbItemObject):
 
 			if trigger_action == "enable" or trigger_action == "disable":
 				enable = trigger_action == "enable"
+				self.aboutToChange()
 				self.database().connector.enableAllTableTriggers(enable, (self.schemaName(), self.name) )
 				self.refreshTriggers()
 				return True
@@ -745,12 +766,14 @@ class Table(DbItemObject):
 			QApplication.setOverrideCursor(Qt.WaitCursor)
 
 			if trigger_action == "delete":
+				self.aboutToChange()
 				self.database().connector.deleteTableTrigger(trigger_name, (self.schemaName(), self.name) )
 				self.refreshTriggers()
 				return True
 
 			elif trigger_action == "enable" or trigger_action == "disable":
 				enable = trigger_action == "enable"
+				self.aboutToChange()
 				self.database().connector.enableTableTrigger(trigger_name, enable, (self.schemaName(), self.name) )
 				self.refreshTriggers()
 				return True
@@ -784,6 +807,7 @@ class VectorTable(Table):
 		return False
 
 	def createSpatialIndex(self, geom_column=None):
+		self.aboutToChange()
 		geom_column = geom_column if geom_column != None else self.geomColumn
 		ret = self.database().connector.createSpatialIndex( (self.schemaName(), self.name), geom_column)
 		if ret != False:
@@ -791,6 +815,7 @@ class VectorTable(Table):
 		return ret
 
 	def deleteSpatialIndex(self, geom_column=None):
+		self.aboutToChange()
 		geom_column = geom_column if geom_column != None else self.geomColumn
 		ret = self.database().connector.deleteSpatialIndex( (self.schemaName(), self.name), geom_column)
 		if ret != False:
@@ -909,6 +934,7 @@ class TableField(TableSubItemObject):
 		return self.update(new_name)
 
 	def update(self, new_name, new_type_str=None, new_not_null=None, new_default_str=None):
+		self.table().aboutToChange()
 		if self.name == new_name: new_name = None
 		if self.type2String() == new_type_str: new_type_str = None
 		if self.notNull == new_not_null: new_not_null = None

@@ -50,9 +50,15 @@ class LayerPreview(QgsMapCanvas):
 	def loadPreview(self, item, force=False):
 		if item == self.item and not force: 
 			return
-
 		self._clear()
+
+		if item is None:
+			return
+
 		self.item = item
+		self.connect(self.item, SIGNAL('aboutToChange'), self._clear)
+		self.connect(self.item, SIGNAL('changed'), self.refresh)
+
 		if isinstance(item, Table) and item.type in [Table.VectorType, Table.RasterType]:
 			# update the preview, but first let the manager chance to show the canvas
 			runPrev = lambda: self._loadTablePreview( item )
@@ -61,6 +67,10 @@ class LayerPreview(QgsMapCanvas):
 
 	def _clear(self):
 		""" remove any layers from preview canvas """
+		if self.item is not None:
+			self.disconnect(self.item, SIGNAL('aboutToChange'), self._clear)
+			self.disconnect(self.item, SIGNAL('changed'), self.refresh)
+
 		self.item = None
 		self.currentLayerId = None
 		self.setLayerSet( [] )
