@@ -24,7 +24,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from ..data_model import TableDataModel, SqlResultModel
-from ..plugin import DbError
+from ..plugin import BaseError
 
 class PGTableDataModel(TableDataModel):
 	def __init__(self, table, parent=None):
@@ -35,6 +35,7 @@ class PGTableDataModel(TableDataModel):
 			self.table.refreshRowCount()
 			if self.table.rowCount == None:
 				return
+
 		self._createCursor()
 
 	def _createCursor(self):
@@ -54,19 +55,21 @@ class PGTableDataModel(TableDataModel):
 			return u"CASE WHEN %(fld)s IS NULL THEN NULL ELSE 'RASTER' END AS %(fld)s" % {'fld': self.db.quoteId(field.name)}
 		return u"%s::text" % self.db.quoteId(field.name)
 
+	def _deleteCursor(self):
+		if self.cursor is not None and not self.cursor.closed:
+			self.cursor.close()
+		self.cursor = None
 
 	def __del__(self):
 		# close cursor and save memory
-		self.cursor.close()
-		del self.cursor
+		self._deleteCursor()
 		pass	#print "PGTableModel.__del__"
 
 	def fetchMoreData(self, row_start):
 		try:
 			self.cursor.scroll(row_start, mode='absolute')
-		except self.db.connector._error_types():
-			self.cursor.close()
-			del self.cursor
+		except BaseError:
+			self._deleteCursor()
 			self._createCursor()
 			return self.fetchMoreData(row_start)
 
