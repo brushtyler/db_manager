@@ -68,8 +68,13 @@ class BaseTableModel(QAbstractTableModel):
 
 		if val == None:
 			return QVariant("NULL")
-		else:
-			return QVariant( unicode(val) )	# convert to string
+		elif isinstance(val, buffer):
+			# hide binary data
+			return QVariant()
+		elif isinstance(val, (str, unicode, QString)) and len(val) > 300:
+			# too much data to display, elide the string
+			return QVariant( u"%s..." % val[:300] )
+		return QVariant( unicode(val) )	# convert to string
 	
 	def headerData(self, section, orientation, role):
 		if role != Qt.DisplayRole:
