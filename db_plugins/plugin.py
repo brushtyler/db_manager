@@ -357,22 +357,22 @@ class Database(DbItemObject):
 
 	def prepareMenuMoveTableToSchemaActionSlot(self, item, menu, mainWindow):
 		""" populate menu with schemas """
-		slot = lambda x: lambda: self.moveTableToSchemaActionSlot(item, x, mainWindow)
+		slot = lambda x: lambda: mainWindow.invokeCallback(self.moveTableToSchemaActionSlot, [x])
 
 		menu.clear()
 		for schema in self.schemas():
 			action = menu.addAction(schema.name, slot(schema))
 		
-	def moveTableToSchemaActionSlot(self, item, schema, parent):
-		if not isinstance(item, Table):
-			QMessageBox.information(parent, "Sorry", "Select a TABLE/VIEW.")
-			return
-
-		QApplication.setOverrideCursor(Qt.WaitCursor)
+	def moveTableToSchemaActionSlot(self, item, action, parent, new_schema):
+		QApplication.restoreOverrideCursor()
 		try:
-			item.moveToSchema(schema)
+			if not isinstance(item, Table):
+				QMessageBox.information(parent, "Sorry", "Select a TABLE/VIEW.")
+				return
 		finally:
-			QApplication.restoreOverrideCursor()
+			QApplication.setOverrideCursor(Qt.WaitCursor)
+
+		item.moveToSchema(new_schema)
 
 
 	def tablesFactory(self, row, db, schema=None):
@@ -461,6 +461,7 @@ class Schema(DbItemObject):
 		self.aboutToChange()
 		ret = self.database().connector.renameSchema(self.name, new_name)
 		if ret != False:
+			self.name = new_name
 			self.refresh()
 		return ret
 

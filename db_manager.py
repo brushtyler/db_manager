@@ -245,13 +245,26 @@ class DBManager(QMainWindow):
 		return True
 
 
-	def invokeCallback(self, callback):
+	def invokeCallback(self, callback, params=None):
+		""" Call a method passing the selected item in the database tree, 
+			the sender (usually a QAction), the plugin mainWindow and 
+			optionally additional parameters. 
+
+			This method takes care to override and restore the cursor, 
+			but also catches exceptions and displays the error dialog.
+		"""
 		QApplication.setOverrideCursor(Qt.WaitCursor)
 		try:
-			callback( self.tree.currentItem(), self.sender(), self ) 
+			if params is None:
+				callback( self.tree.currentItem(), self.sender(), self )
+			else:
+				callback( self.tree.currentItem(), self.sender(), self, *params )
+
 		except BaseError, e:
+			# catch database errors and display the error dialog
 			DlgDbError.showError(e, self)
 			return
+
 		finally:
 			QApplication.restoreOverrideCursor()
 
@@ -324,7 +337,7 @@ class DBManager(QMainWindow):
 		self.setCentralWidget(self.tabs)
 
 		# create database tree
-		self.dock = QDockWidget("Databases", self)
+		self.dock = QDockWidget("Tree", self)
 		self.dock.setObjectName("DB_Manager_DBView")
 		self.dock.setFeatures(QDockWidget.DockWidgetMovable)
 		self.tree = DBTree(self)
@@ -349,7 +362,7 @@ class DBManager(QMainWindow):
 		self.setMenuBar(self.menuBar)
 
 		# create toolbar
-		self.toolBar = QToolBar(self)
+		self.toolBar = QToolBar("Default", self)
 		self.toolBar.setObjectName("DB_Manager_ToolBar")
 		self.toolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
 		self.addToolBar(self.toolBar)
