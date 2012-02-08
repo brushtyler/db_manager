@@ -250,8 +250,9 @@ class Database(DbItemObject):
 
 
 	def reconnectActionSlot(self, item, action, parent):
-		item.database().connection().reconnect()
-		item.database().refresh()
+		db = item.database()
+		db.connection().reconnect()
+		db.refresh()
 
 
 	def deleteActionSlot(self, item, action, parent):
