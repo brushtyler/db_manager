@@ -91,8 +91,11 @@ class DBPlugin(QObject):
 		return False
 
 	def reconnect(self):
-		if self.db:
-			return self.connect( self.db.uri() )
+		if self.db is not None:
+			uri = self.db.uri()
+			self.db.deleteLater()
+			self.db = None
+			return self.connect( uri )
 		return self.connect( self.parent() )
 
 	@classmethod
