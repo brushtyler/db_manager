@@ -76,7 +76,7 @@ class SpatiaLiteDBPlugin(DBPlugin):
 		import qgis.core
 		uri = qgis.core.QgsDataSourceURI()
 		uri.setDatabase(database)
-		return DBPlugin.connect(self, uri)
+		return self.connectToUri(uri)
 
 
 class SLDatabase(Database):

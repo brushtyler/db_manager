@@ -94,7 +94,7 @@ class PostGisDBPlugin(DBPlugin):
 
 		err = QString()
 		try:
-			return DBPlugin.connect(self, uri)
+			return self.connectToUri(uri)
 		except ConnectionError, e:
 			err = QString( str(e) )
 
@@ -121,7 +121,7 @@ class PostGisDBPlugin(DBPlugin):
 				uri.setConnection(host, port, database, username, password, sslmode)
 
 			try:
-				DBPlugin.connect(self, uri)
+				self.connectToUri(uri)
 			except ConnectionError, e:
 				if i == max_attempts-1:	# failed the last attempt
 					raise e

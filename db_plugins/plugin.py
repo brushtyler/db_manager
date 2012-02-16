@@ -84,7 +84,7 @@ class DBPlugin(QObject):
 		from .info_model import DatabaseInfo
 		return DatabaseInfo(None)
 
-	def connect(self, uri):
+	def connectToUri(self, uri):
 		self.db = self.databasesFactory( self, uri )
 		if self.db: 
 			return True
@@ -95,7 +95,7 @@ class DBPlugin(QObject):
 			uri = self.db.uri()
 			self.db.deleteLater()
 			self.db = None
-			return self.connect( uri )
+			return self.connectToUri( uri )
 		return self.connect( self.parent() )
 
 	@classmethod
