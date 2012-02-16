@@ -73,9 +73,9 @@ class PostGisDBPlugin(DBPlugin):
 
 		from qgis.core import QgsDataSourceURI
 		uri = QgsDataSourceURI()
-	
-		get_value_str = lambda x: settings.value(x).toString()
-		host, port, database, username, password = map(get_value_str, ["host", "port", "database", "username", "password"])
+
+		settingsList = ["service", "host", "port", "database", "username", "password"]
+		service, host, port, database, username, password = map(lambda x: settings.value(x).toString(), settingsList)
 
 		# qgis1.5 use 'savePassword' instead of 'save' setting
 		savedPassword = settings.value("save", False).toBool() or settings.value("savePassword", False).toBool()
@@ -85,7 +85,11 @@ class PostGisDBPlugin(DBPlugin):
 
 		settings.endGroup()
 
-		uri.setConnection(host, port, database, username, password, sslmode)
+		if not service.isEmpty():
+			uri.setConnection(service, database, username, password, sslmode)
+		else:
+			uri.setConnection(host, port, database, username, password, sslmode)
+			
 		uri.setUseEstimatedMetadata(useEstimatedMetadata)
 
 		err = QString()
@@ -111,7 +115,10 @@ class PostGisDBPlugin(DBPlugin):
 			if not ok:
 				return False
 
-			uri.setConnection(host, port, database, username, password, sslmode)
+			if not service.isEmpty():
+				uri.setConnection(service, database, username, password, sslmode)
+			else:
+				uri.setConnection(host, port, database, username, password, sslmode)
 
 			try:
 				DBPlugin.connect(self, uri)
