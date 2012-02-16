@@ -2,6 +2,7 @@ DB Manager TODO and DONE list.
 
 
 DONE:
+* add contestual menu to db tree, use service param when available to connect to PG dbs (v0.1.16)
 * close transactions before doing changes to tables (v0.1.15)
 * improve error handling running a query in sql window (v0.1.14)
 * fix error dialog (v0.1.13)
