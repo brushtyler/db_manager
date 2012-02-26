@@ -201,3 +201,12 @@ class DBConnector:
 		else:
 			return (table[0], table[1])
 
+	@classmethod
+	def getSqlDictionary(self):
+		""" return a generic SQL dictionary """
+		try:
+			from ..sql_dictionary import getSqlDictionary
+			return getSqlDictionary()
+		except ImportError:
+			return []
+

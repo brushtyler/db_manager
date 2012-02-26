@@ -591,3 +591,7 @@ class SpatiaLiteDBConnector(DBConnector):
 	#def _get_cursor_columns(self, c):
 	#	pass
 
+	def getSqlDictionary(self):
+		from .sql_dictionary import getSqlDictionary
+		return getSqlDictionary()
+

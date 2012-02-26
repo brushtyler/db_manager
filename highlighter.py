@@ -68,8 +68,6 @@ class SqlHighlighter(QSyntaxHighlighter):
 		self.styles['constant'] = format
 
 	def highlightBlock(self, text):
-		text = text.toLower()
-
 		index = 0
 		rule_sel = None
 		rule_index = -1
@@ -121,17 +119,20 @@ class SqlHighlighter(QSyntaxHighlighter):
 	def load(self, db=None):
 		self.rules = []
 
-		if False and db:
+		rules = None
+
+		if db:
 			rules = db.connector.getSqlDictionary()
-		else:
+		if not rules:
+			# use the generic sql dictionary
 			from .sql_dictionary import getSqlDictionary
-			rules = getSqlDictionary( db.connection().typeName() if db else None )
+			rules = getSqlDictionary()
 
 		for name in self.styles.keys():
-			if not rules.has_key(name):
+			if not name in rules:
 				continue
-			for value in rules[name]:				
-				regex = QRegExp( u"\\b%s\\b" % QRegExp.escape(value) )
+			for value in rules[name]:
+				regex = QRegExp( u"\\b%s\\b" % QRegExp.escape(value), Qt.CaseInsensitive )
 				rule = HighlightingRule(name, regex)
 				self.rules.append( rule )
 
