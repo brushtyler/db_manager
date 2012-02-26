@@ -186,7 +186,6 @@ class PGSchema(Schema):
 	def __init__(self, row, db):
 		Schema.__init__(self, db)
 		self.oid, self.name, self.owner, self.perms, self.comment = row
-		self.tableCount = len(self.tables())
 
 
 class PGTable(Table):

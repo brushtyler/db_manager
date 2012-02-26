@@ -138,7 +138,7 @@ class SchemaInfo:
 
 	def generalInfo(self):
 		tbl = [
-			("Tables:", self.schema.tableCount)
+			#("Tables:", self.schema.tableCount)
 		]
 		if self.schema.owner:
 			tbl.append( ("Owner:", self.schema.owner) )
