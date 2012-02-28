@@ -34,7 +34,7 @@ class SqlHighlighter(QSyntaxHighlighter):
 	COLOR_IDENTIFIER = QColor(0x00,0x99,0x00)
 	COLOR_PARAMETER = QColor(0x25,0x9D,0x9D)
 
-	def __init__(self, editor):
+	def __init__(self, editor, db=None):
 		QSyntaxHighlighter.__init__(self, editor)
 		self.editor = editor
 		self.rules = []
@@ -66,6 +66,9 @@ class SqlHighlighter(QSyntaxHighlighter):
 		format = QTextCharFormat()
 		format.setForeground( QBrush(self.COLOR_CONSTANT, Qt.SolidPattern) )
 		self.styles['constant'] = format
+
+		if db:
+			self.load(db)
 
 	def highlightBlock(self, text):
 		index = 0

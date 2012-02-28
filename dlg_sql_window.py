@@ -31,6 +31,7 @@ from .db_plugins.plugin import BaseError
 from .dlg_db_error import DlgDbError
 
 from highlighter import SqlHighlighter
+from completer import SqlCompleter
 
 class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 
@@ -39,6 +40,7 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 		self.iface = iface
 		self.db = db
 		self.setupUi(self)
+		self.setWindowTitle( u"%s - %s [%s]" % (self.windowTitle(), db.connection().connectionName(), db.connection().typeNameString()) )
 
 		self.defaultLayerName = 'QueryLayer'
 
@@ -46,7 +48,8 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 		self.restoreGeometry(settings.value("/DB_Manager/sqlWindow/geometry").toByteArray())
 
 		self.editSql.setAcceptRichText(False)
-		SqlHighlighter(self.editSql).load(self.db)
+		SqlCompleter(self.editSql, self.db)
+		SqlHighlighter(self.editSql, self.db)
 
 		# allow to copy results
 		copyAction = QAction("copy", self)
