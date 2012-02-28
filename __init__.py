@@ -27,7 +27,7 @@ def description():
 	return "Manage your databases within QGis"
 
 def version():
-	return "0.1.17"
+	return "0.1.18"
 
 def qgisMinimumVersion():
 	return "1.5.0"
