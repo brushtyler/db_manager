@@ -9,8 +9,8 @@ copyright            : (C) 2011 by Giuseppe Sucameli
 email                : brush.tyler@gmail.com
 
 The content of this file is based on 
-- Qt 4.3 Custom Completer Example by TrollTech (GPLv2 license) 
-see http://doc.trolltech.com/4.3/tools-customcompleter.html
+- QTextEdit with autocompletion using pyqt by rowinggolfer (GPLv2 license)
+see http://rowinggolfer.blogspot.com/2010/08/qtextedit-with-autocompletion-using.html
  ***************************************************************************/
 
 /***************************************************************************
@@ -124,10 +124,8 @@ class CompletionTextEdit(QTextEdit):
 		self.completer.complete(cr) # popup it up!
 
 #if __name__ == "__main__":
-#
 #	app = QApplication([])
-#	completer = DictionaryCompleter()
 #	te = CompletionTextEdit()
-#	te.setCompleter(completer)
+#	SqlCompleter( te )
 #	te.show()
 #	app.exec_()
