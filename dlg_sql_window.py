@@ -130,9 +130,15 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 			QMessageBox.warning(self, self.tr( "Sorry" ), self.tr( "You must fill the required fields: \ngeometry column - column with unique integer values" ) )
 			return
 
+		query = self.editSql.toPlainText()
+		if query.isEmpty():
+			return
+
+		# try to sanitize query
+		query = query.replace( QRegExp( ";\\s*$" ), "" )
+
 		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
 
-		query = self.editSql.toPlainText()
 		from qgis.core import QgsMapLayer, QgsMapLayerRegistry
 		layerType = QgsMapLayer.VectorLayer if self.vectorRadio.isChecked() else QgsMapLayer.RasterLayer
 
