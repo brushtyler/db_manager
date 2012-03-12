@@ -66,6 +66,9 @@ class DBConnector:
 	def connection_error_types():
 		raise Exception("DBConnector.connection_error_types() is an abstract method")
 
+	def error_types():
+		return self.connection_error_types() + self.execution_error_types()
+
 	def _execute(self, cursor, sql):
 		if cursor == None:
 			cursor = self._get_cursor()
@@ -103,6 +106,16 @@ class DBConnector:
 			# do the rollback to avoid a "current transaction aborted, commands ignored" errors
 			self._rollback()
 			raise DbError(e)
+
+	def _close_cursor(self, c):
+		try:
+			if c and not c.closed:
+				c.close()
+		
+		except self.error_types(), e:
+			pass
+
+		return
 
 
 	def _fetchall(self, c):

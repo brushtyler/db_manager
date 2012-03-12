@@ -57,25 +57,21 @@ class PGTableDataModel(TableDataModel):
 		return u"%s::text" % self.db.quoteId(field.name)
 
 	def _deleteCursor(self):
-		try:
-			if self.cursor is not None and not self.cursor.closed:
-				self.cursor.close()
-		except BaseError:
-			pass
+		self.db._close_cursor(self.cursor)
 		self.cursor = None
 
 	def __del__(self):
-		self._deleteCursor()
 		self.disconnect(self.table, SIGNAL("aboutToChange"), self._deleteCursor)
+		self._deleteCursor()
 		pass	#print "PGTableModel.__del__"
 
 	def fetchMoreData(self, row_start):
-		if self.cursor is None:
+		if not self.cursor:
 			self._createCursor()
 
 		try:
 			self.cursor.scroll(row_start, mode='absolute')
-		except BaseError:
+		except self.db.error_types():
 			self._deleteCursor()
 			return self.fetchMoreData(row_start)
 
