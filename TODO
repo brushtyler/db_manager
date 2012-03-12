@@ -2,6 +2,7 @@ DB Manager TODO and DONE list.
 
 
 DONE:
+* add versioning support to PostgreSQL dbs (v0.1.19)
 * completer for sql keywords/functions (v0.1.18)
 * highlights PG and SL functions, fix slow connection to PG db (v0.1.17)
 * add contestual menu to db tree, use service param when available to connect to PG dbs (v0.1.16)
@@ -23,7 +24,6 @@ DONE:
 
 TODO:
 - PGManager
-    * versioning
     * GUI to import/export data (from shapefiles)
 - RT_Sql_Layer
     * query builder
