@@ -167,10 +167,14 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 
 		schema = self.outUri.schema() if not self.cboSchema.isEnabled() else self.cboSchema.currentText()
 		table = self.cboTable.currentText()
+
 		pk = self.outUri.keyColumn() if not self.chkPrimaryKey.isChecked() else self.editPrimaryKey.text()
 		pk = pk if pk != "" else self.default_pk
+
 		geom = self.outUri.geometryColumn() if not self.chkGeomColumn.isChecked() else self.editGeomColumn.text()
-		geom = geom if geom != "" else self.default_geom
+		if self.inLayer.hasGeometryType():
+			geom = geom if geom != "" else self.default_geom
+		
 		self.outUri.setDataSource( schema, table, geom, QString(), pk )
 		uri = self.outUri.uri()
 
