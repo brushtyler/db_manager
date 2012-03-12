@@ -867,7 +867,7 @@ class PostGisDBConnector(DBConnector):
 
 
 	def execution_error_types(self):
-		return psycopg2.Error
+		return psycopg2.Error, psycopg2.ProgrammingError
 
 	def connection_error_types(self):
 		return psycopg2.InterfaceError, psycopg2.OperationalError
