@@ -320,6 +320,9 @@ class DBManager(QMainWindow):
 				self.unregisterAction( action, menuName )
 		del self._registeredDbActions
 
+	def about(self):
+		from .dlg_about import DlgAbout
+		DlgAbout(self).exec_()
 
 	def setupUi(self):
 		self.setWindowTitle("DB Manager")
@@ -389,8 +392,7 @@ class DBManager(QMainWindow):
 		self.actionShowSystemTables.setVisible(False)
 
 		# menu HELP
-		actionMenuHelp.setVisible(False)
-		#self.actionAbout = self.menuHelp.addAction(QIcon(":/db_manager/about"), "&About", self.about)
+		self.actionAbout = self.menuHelp.addAction(QIcon(":/db_manager/about"), "&About", self.about)
 
 		# add actions to the toolbar
 		self.toolBar.addAction( self.actionRefresh )
