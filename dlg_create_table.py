@@ -26,7 +26,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from .db_plugins.data_model import TableFieldsModel
-from .db_plugins.plugin import DbError
+from .db_plugins.plugin import DbError, ConnectionError
 from .dlg_db_error import DlgDbError
 
 from ui.DlgCreateTable_ui import Ui_DlgCreateTable
@@ -306,7 +306,7 @@ class DlgCreateTable(QDialog, Ui_DlgCreateTable):
 				geom = geomColumn, geomType, geomSrid, geomDim, useSpatialIndex
 				self.db.createVectorTable(table, flds, geom, schema)
 
-		except DbError, e:
+		except (ConnectionError, DbError), e:
 			DlgDbError.showError(e, self)
 			return
 
