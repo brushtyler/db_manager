@@ -83,14 +83,21 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 		self.loadAsLayerGroup.setChecked( checked )
 		self.loadAsLayerWidget.setVisible( checked )
 
-		
+
+	def getSql(self):
+		sql = self.editSql.textCursor().selectedText()
+		if sql.isEmpty():
+			sql = self.editSql.toPlainText()
+		# try to sanitize query
+		sql = sql.replace( QRegExp( ";\\s*$" ), "" )
+		return sql
+
 	def clearSql(self):
-		self.editSql.setPlainText(QString())
+		self.editSql.clear()
 
 	def executeSql(self):
-		sql = self.editSql.toPlainText()
-		if sql.isEmpty():
-			return
+		sql = self.getSql()
+		if sql.isEmpty(): return
 
 		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
 
@@ -130,12 +137,9 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 			QMessageBox.warning(self, self.tr( "Sorry" ), self.tr( "You must fill the required fields: \ngeometry column - column with unique integer values" ) )
 			return
 
-		query = self.editSql.toPlainText()
+		query = self.getSql()
 		if query.isEmpty():
 			return
-
-		# try to sanitize query
-		query = query.replace( QRegExp( ";\\s*$" ), "" )
 
 		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
 
@@ -164,12 +168,8 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 		QApplication.restoreOverrideCursor()
 
 	def fillColumnCombos(self):
-		query = self.editSql.toPlainText()
-		if query.isEmpty():
-			return
-
-		# try to sanitize query
-		query = query.replace( QRegExp( ";\\s*$" ), "" )
+		query = self.getSql()
+		if query.isEmpty(): return
 
 		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
 		self.uniqueCombo.clear()
