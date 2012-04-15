@@ -85,7 +85,11 @@ class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 
 
 	def getSql(self):
-		sql = self.editSql.textCursor().selectedText()
+		# If the selection obtained from an editor spans a line break, 
+		# the text will contain a Unicode U+2029 paragraph separator 
+		# character instead of a newline \n character 
+		# (see https://qt-project.org/doc/qt-4.8/qtextcursor.html#selectedText)
+		sql = self.editSql.textCursor().selectedText().replace(unichr(0x2029), "\n")
 		if sql.isEmpty():
 			sql = self.editSql.toPlainText()
 		# try to sanitize query
