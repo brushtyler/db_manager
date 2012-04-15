@@ -128,7 +128,7 @@ class DBTree(QTreeView):
 
 	def rename(self):
 		index = self.currentIndex()
-		item = self.model.getItem(index)
+		item = self.model().getItem(index)
 		if isinstance(item, (Table, Schema)):
 			self.edit( index )
 
