@@ -413,7 +413,7 @@ class Database(DbItemObject):
 		return ret
 
 	def createVectorTable(self, table, fields, geom, schema=None):
-		ret = self.createTable( (schema, table), fields)
+		ret = self.createTable(table, fields, schema)
 		if ret == False:
 			return False
 
