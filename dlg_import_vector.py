@@ -30,7 +30,7 @@ import qgis.core
 from .db_plugins.plugin import DbError
 from .dlg_db_error import DlgDbError
 
-from ui.DlgImportVector_ui import Ui_DlgImportVector
+from .ui.ui_DlgImportVector import Ui_DlgImportVector
 
 class DlgImportVector(QDialog, Ui_DlgImportVector):
 
@@ -148,19 +148,19 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 	def importLayer(self):
 		# sanity checks
 		if self.cboTable.currentText().isEmpty():
-			QMessageBox.information(self, "error", "Table name is empty!")
+			QMessageBox.information(self, "Import to database", "Table name is required")
 			return
 
 		if self.chkSourceSrid.isChecked():
 			sourceSrid, ok = self.editSourceSrid.text().toInt()
 			if not ok:
-				QMessageBox.information(self, "error", "Invalid source srid: must be and integer")
+				QMessageBox.information(self, "Import to database", "Invalid source srid: must be an integer")
 				return
 
 		if self.chkTargetSrid.isChecked():
 			targetSrid, ok = self.editTargetSrid.text().toInt()
 			if not ok:
-				QMessageBox.information(self, "error", "Invalid target srid: must be and integer")
+				QMessageBox.information(self, "Import to database", "Invalid target srid: must be an integer")
 				return
 
 		QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
@@ -203,13 +203,13 @@ class DlgImportVector(QDialog, Ui_DlgImportVector):
 		ret, errMsg = qgis.core.QgsVectorLayerImport.importLayer( self.inLayer, uri, providerName, outCrs, False, False, options )
 		QApplication.restoreOverrideCursor()
 		if ret != 0:
-			QMessageBox.warning(self, "Error [%d]" % ret, errMsg )
+			QMessageBox.warning(self, "Import to database", u"Error %d\n%s" % (ret, errMsg) )
 			return
 
-		if self.chkGeomColumn.isChecked() and self.chkSpatialIndex.isChecked():
+		if self.chkSpatialIndex.isChecked():
 			self.db.connector.createSpatialIndex( (schema, table), geom )
 
-		QMessageBox.information(self, "Good", "Everything went fine")
+		QMessageBox.information(self, "Import to database", "Import was successful.")
 		return self.accept()
 
 
