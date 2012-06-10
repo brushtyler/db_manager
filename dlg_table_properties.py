@@ -29,12 +29,12 @@ from .db_plugins.data_model import TableFieldsModel, TableConstraintsModel, Tabl
 from .db_plugins.plugin import BaseError
 from .dlg_db_error import DlgDbError
 
-from dlg_field_properties import DlgFieldProperties
-from dlg_add_geometry_column import DlgAddGeometryColumn
-from dlg_create_constraint import DlgCreateConstraint
-from dlg_create_index import DlgCreateIndex
+from .dlg_field_properties import DlgFieldProperties
+from .dlg_add_geometry_column import DlgAddGeometryColumn
+from .dlg_create_constraint import DlgCreateConstraint
+from .dlg_create_index import DlgCreateIndex
 
-from ui.DlgTableProperties_ui import Ui_DlgTableProperties
+from .ui.DlgTableProperties_ui import Ui_DlgTableProperties
 
 class DlgTableProperties(QDialog, Ui_DlgTableProperties):
 	

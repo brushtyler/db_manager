@@ -24,7 +24,7 @@ Based on PG_Manager by Martin Dobias <wonder.sk@gmail.com> (GPLv2 license)
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from DlgVersioning_ui import Ui_DlgVersioning
+from .DlgVersioning_ui import Ui_DlgVersioning
 
 from .....dlg_db_error import DlgDbError
 from ....plugin import BaseError, Table

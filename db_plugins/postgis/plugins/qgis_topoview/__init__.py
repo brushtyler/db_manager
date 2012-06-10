@@ -73,7 +73,7 @@ def run(item, action, mainwindow):
 		return False
 
 	# create the new project from the template one
-	tpl_name = u'topoview_tpl.qgs'
+	tpl_name = u'topoview_template.qgs'
 	toponame = item.schema().name
 	project_name = u'topoview_%s_%s.qgs' % (uri.database(), toponame)
 

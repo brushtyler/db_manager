@@ -61,7 +61,7 @@ class DBManagerPlugin:
 			self.dlg.close()
 
 	def run(self):
-		# keep opened only one instance 
+		# keep opened only one instance
 		if self.dlg == None:
 			from db_manager import DBManager
 			self.dlg = DBManager(self.iface, self.iface.mainWindow())

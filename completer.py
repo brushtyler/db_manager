@@ -8,7 +8,7 @@ Date                 : May 23, 2011
 copyright            : (C) 2011 by Giuseppe Sucameli
 email                : brush.tyler@gmail.com
 
-The content of this file is based on 
+The content of this file is based on
 - QTextEdit with autocompletion using pyqt by rowinggolfer (GPLv2 license)
 see http://rowinggolfer.blogspot.com/2010/08/qtextedit-with-autocompletion-using.html
  ***************************************************************************/
@@ -119,7 +119,7 @@ class CompletionTextEdit(QTextEdit):
 			popup.setCurrentIndex(self.completer.completionModel().index(0,0))
 
 		cr = self.cursorRect()
-		cr.setWidth(self.completer.popup().sizeHintForColumn(0) 
+		cr.setWidth(self.completer.popup().sizeHintForColumn(0)
 				+ self.completer.popup().verticalScrollBar().sizeHint().width())
 		self.completer.complete(cr) # popup it up!
 

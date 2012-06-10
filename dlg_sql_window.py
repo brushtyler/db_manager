@@ -25,13 +25,13 @@ The content of this file is based on
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from .ui.DlgSqlWindow_ui import Ui_DlgSqlWindow
-
 from .db_plugins.plugin import BaseError
 from .dlg_db_error import DlgDbError
 
-from highlighter import SqlHighlighter
-from completer import SqlCompleter
+from .ui.DlgSqlWindow_ui import Ui_DlgSqlWindow
+
+from .highlighter import SqlHighlighter
+from .completer import SqlCompleter
 
 class DlgSqlWindow(QDialog, Ui_DlgSqlWindow):
 

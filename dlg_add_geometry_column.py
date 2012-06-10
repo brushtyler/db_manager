@@ -29,7 +29,7 @@ from .db_plugins.plugin import DbError
 from .dlg_db_error import DlgDbError
 from .db_plugins.plugin import TableField
 
-from ui.DlgAddGeometryColumn_ui import Ui_DlgAddGeometryColumn
+from .ui.DlgAddGeometryColumn_ui import Ui_DlgAddGeometryColumn
 
 class DlgAddGeometryColumn(QDialog, Ui_DlgAddGeometryColumn):
 

@@ -30,7 +30,7 @@ import qgis.core
 from .db_plugins.plugin import DbError
 from .dlg_db_error import DlgDbError
 
-from .ui.ui_DlgImportVector import Ui_DlgImportVector
+from .ui.DlgImportVector_ui import Ui_DlgImportVector
 
 class DlgImportVector(QDialog, Ui_DlgImportVector):
 

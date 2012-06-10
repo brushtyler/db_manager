@@ -29,7 +29,7 @@ from .db_plugins.plugin import DbError
 from .dlg_db_error import DlgDbError
 from .db_plugins.plugin import TableConstraint
 
-from ui.DlgCreateConstraint_ui import Ui_DlgCreateConstraint
+from .ui.DlgCreateConstraint_ui import Ui_DlgCreateConstraint
 
 class DlgCreateConstraint(QDialog, Ui_DlgCreateConstraint):
 	

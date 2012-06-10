@@ -29,7 +29,7 @@ from .db_plugins.data_model import TableFieldsModel
 from .db_plugins.plugin import DbError, ConnectionError
 from .dlg_db_error import DlgDbError
 
-from ui.DlgCreateTable_ui import Ui_DlgCreateTable
+from .ui.DlgCreateTable_ui import Ui_DlgCreateTable
 
 
 class TableFieldsDelegate(QItemDelegate):

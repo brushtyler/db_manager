@@ -4,7 +4,7 @@ from PyQt4.QtGui import *
 
 from .db_plugins.plugin import TableField
 
-from ui.DlgFieldProperties_ui import Ui_DlgFieldProperties
+from .ui.DlgFieldProperties_ui import Ui_DlgFieldProperties
 
 class DlgFieldProperties(QDialog, Ui_DlgFieldProperties):
 	

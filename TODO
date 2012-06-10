@@ -2,6 +2,7 @@ DB Manager TODO and DONE list.
 
 
 DONE:
+* run only the selected part of a query (v0.1.20)
 * add versioning support to PostgreSQL dbs (v0.1.19)
 * completer for sql keywords/functions (v0.1.18)
 * highlights PG and SL functions, fix slow connection to PG db (v0.1.17)

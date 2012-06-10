@@ -8,7 +8,7 @@ Date                 : May 23, 2011
 copyright            : (C) 2011 by Giuseppe Sucameli
 email                : brush.tyler@gmail.com
 
-The content of this file is based on 
+The content of this file is based on
 - PG_Manager by Martin Dobias (GPLv2 license)
  ***************************************************************************/
 
@@ -168,7 +168,7 @@ class DBManager(QMainWindow):
 
 		from dlg_sql_window import DlgSqlWindow
 		dlg = DlgSqlWindow(self.iface, db, self)
-		#refreshDb = lambda x: self.refreshItem( db.connection() ) # refresh the database tree 
+		#refreshDb = lambda x: self.refreshItem( db.connection() ) # refresh the database tree
 		#self.connect( dlg, SIGNAL( "queryExecuted(const QString &)" ), refreshDb )
 		dlg.show()
 		dlg.exec_()
@@ -246,11 +246,11 @@ class DBManager(QMainWindow):
 
 
 	def invokeCallback(self, callback, params=None):
-		""" Call a method passing the selected item in the database tree, 
-			the sender (usually a QAction), the plugin mainWindow and 
-			optionally additional parameters. 
+		""" Call a method passing the selected item in the database tree,
+			the sender (usually a QAction), the plugin mainWindow and
+			optionally additional parameters.
 
-			This method takes care to override and restore the cursor, 
+			This method takes care to override and restore the cursor,
 			but also catches exceptions and displays the error dialog.
 		"""
 		QApplication.setOverrideCursor(Qt.WaitCursor)

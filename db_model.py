@@ -25,7 +25,7 @@ from PyQt4.QtGui import *
 
 from .db_plugins import supportedDbTypes, createDbPlugin
 from .db_plugins.plugin import BaseError, DbError, Table
-from dlg_db_error import DlgDbError
+from .dlg_db_error import DlgDbError
 
 import qgis.core
 
@@ -317,12 +317,12 @@ class DBModel(QAbstractItemModel):
 	def getItem(self, index):
 		if not index.isValid():
 			return None
-		return index.internalPointer().getItemData() 
+		return index.internalPointer().getItemData()
 
 	def _getPath(self, index):
 		if not index.isValid():
 			return None
-		return index.internalPointer().path() 
+		return index.internalPointer().path()
 
 
 	def columnCount(self, parent):

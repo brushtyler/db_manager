@@ -29,7 +29,7 @@ from .db_plugins.plugin import DbError
 from .dlg_db_error import DlgDbError
 from .db_plugins.plugin import TableIndex
 
-from ui.DlgCreateIndex_ui import Ui_DlgCreateIndex
+from .ui.DlgCreateIndex_ui import Ui_DlgCreateIndex
 
 
 class DlgCreateIndex(QDialog, Ui_DlgCreateIndex):

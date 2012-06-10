@@ -25,7 +25,7 @@ The content of this file is based on
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-from ui.DlgDbError_ui import Ui_DlgDbError
+from .ui.DlgDbError_ui import Ui_DlgDbError
 from .db_plugins.plugin import DbError
 
 class DlgDbError(QDialog, Ui_DlgDbError):
